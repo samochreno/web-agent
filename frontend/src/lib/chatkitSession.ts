@@ -18,6 +18,7 @@ export function createClientSecretFetcher(
 
     const response = await fetch(endpoint, {
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ workflow: { id: workflow } }),
     });
@@ -25,10 +26,11 @@ export function createClientSecretFetcher(
     const payload = (await response.json().catch(() => ({}))) as {
       client_secret?: string;
       error?: string;
+      message?: string;
     };
 
     if (!response.ok) {
-      throw new Error(payload.error ?? "Failed to create session");
+      throw new Error(payload.error ?? payload.message ?? "Failed to create session");
     }
 
     if (!payload.client_secret) {

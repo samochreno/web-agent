@@ -22,15 +22,17 @@ if ! python3 -m pip install -e .; then
   python3 -m pip install --break-system-packages -e .
 fi
 
-# Load env vars from the repo's .env.local (if present) so OPENAI_API_KEY
-# does not need to be exported manually.
-ENV_FILE="$PROJECT_ROOT/../.env.local"
-if [ -z "${OPENAI_API_KEY:-}" ] && [ -f "$ENV_FILE" ]; then
-  echo "Sourcing OPENAI_API_KEY from $ENV_FILE"
+ENV_FILE="$(cd "$PROJECT_ROOT/.." && pwd)/.env.local"
+if [ -f "$ENV_FILE" ]; then
+  echo "Sourcing env vars from $ENV_FILE"
+  existing_openai="${OPENAI_API_KEY:-}"
   # shellcheck disable=SC1090
   set -a
   . "$ENV_FILE"
   set +a
+  if [ -n "$existing_openai" ]; then
+    export OPENAI_API_KEY="$existing_openai"
+  fi
 fi
 
 if [ -z "${OPENAI_API_KEY:-}" ]; then
