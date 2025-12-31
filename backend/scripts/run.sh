@@ -17,7 +17,10 @@ fi
 source .venv/bin/activate
 
 echo "Installing backend deps (editable) ..."
-pip install -e . >/dev/null
+if ! python3 -m pip install -e .; then
+  echo "pip install failed; retrying with --break-system-packages for externally managed environments ..."
+  python3 -m pip install --break-system-packages -e .
+fi
 
 # Load env vars from the repo's .env.local (if present) so OPENAI_API_KEY
 # does not need to be exported manually.
