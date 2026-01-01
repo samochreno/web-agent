@@ -98,12 +98,13 @@ def handle_oauth_callback(session: SessionData, code: str, state: str) -> Google
     flow.fetch_token(code=code)
     creds = flow.credentials
     email = _lookup_email(creds)
+    token_response = getattr(creds, "token_response", None) or {}
     connection = GoogleConnection(
         email=email or "Google user",
         access_token=creds.token,
         refresh_token=creds.refresh_token,
-        token_type=creds.token_response.get("token_type") if creds.token_response else None,
-        scope=creds.token_response.get("scope") if creds.token_response else None,
+        token_type=token_response.get("token_type"),
+        scope=token_response.get("scope"),
         expires_at=creds.expiry,
         created_at=now(),
     )

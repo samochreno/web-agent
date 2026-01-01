@@ -43,7 +43,9 @@ export function SettingsPage({ session, refreshSession }: Props) {
       const response = await loadCalendars();
       setCalendars(response.calendars || []);
     } catch (err) {
-      setCalendarError(err instanceof Error ? err.message : "Unable to load calendars");
+      setCalendarError(
+        err instanceof Error ? err.message : "Unable to load calendars"
+      );
     } finally {
       setLoadingCalendars(false);
     }
@@ -85,8 +87,12 @@ export function SettingsPage({ session, refreshSession }: Props) {
         >
           {session.user ? (
             <div className="flex flex-col gap-2">
-              <p className="text-sm font-semibold text-slate-900">{session.user.email}</p>
-              {session.user.name ? <p className="text-sm text-slate-700">{session.user.name}</p> : null}
+              <p className="text-sm font-semibold text-slate-900">
+                {session.user.email}
+              </p>
+              {session.user.name ? (
+                <p className="text-sm text-slate-700">{session.user.name}</p>
+              ) : null}
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => void handleLogout()}
@@ -103,11 +109,17 @@ export function SettingsPage({ session, refreshSession }: Props) {
         <InfoCard title="ChatKit workflow">
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
             <dt className="text-slate-500">Workflow ID</dt>
-            <dd className="font-semibold text-slate-900">{session.workflow?.id || "Not configured"}</dd>
+            <dd className="font-semibold text-slate-900 truncate">
+              {session.workflow?.id || "Not configured"}
+            </dd>
             <dt className="text-slate-500">Version</dt>
-            <dd className="font-semibold text-slate-900">{session.workflow?.version || "latest"}</dd>
+            <dd className="font-semibold text-slate-900">
+              {session.workflow?.version || "latest"}
+            </dd>
             <dt className="text-slate-500">State variables</dt>
-            <dd className="text-slate-800">date, time, day, cached task lists</dd>
+            <dd className="text-slate-800">
+              date, time, day, cached task lists
+            </dd>
           </dl>
         </InfoCard>
       </div>
@@ -118,20 +130,24 @@ export function SettingsPage({ session, refreshSession }: Props) {
       >
         <div className="space-y-3">
           <p className="text-sm text-slate-700">
-            Connect Google to unlock the scheduling tools. IDs stay masked through aliasing so the model never sees raw
-            Google identifiers, and readonly shared calendars are filtered into the tool output with write protection.
+            Connect Google to unlock the scheduling tools. IDs stay masked
+            through aliasing so the model never sees raw Google identifiers, and
+            readonly shared calendars are filtered into the tool output with
+            write protection.
           </p>
           {googleNotice ? (
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
               Google connected — you can now choose which calendars are shared.
             </div>
           ) : null}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-800">
               {session.google.connected ? "Connected" : "Disconnected"}
             </span>
             <span className="text-sm text-slate-700">
-              {session.google.connected ? session.google.email || "Google account" : "No Google account linked"}
+              {session.google.connected
+                ? session.google.email || "Google account"
+                : "No Google account linked"}
             </span>
             <div className="flex items-center gap-2">
               {session.google.connected ? (
@@ -164,17 +180,21 @@ export function SettingsPage({ session, refreshSession }: Props) {
                 {calendarError}
               </div>
             ) : (
-              <CalendarSelector calendars={calendars} onChange={handleCalendarChange} />
+              <CalendarSelector
+                calendars={calendars}
+                onChange={handleCalendarChange}
+              />
             )}
             <p className="text-xs text-slate-500">
-              Primary calendars are always included. Readonly calendars appear in agent responses but tool updates are
-              blocked to keep shared data safe.
+              Primary calendars are always included. Readonly calendars appear
+              in agent responses but tool updates are blocked to keep shared
+              data safe.
             </p>
           </div>
         ) : (
           <p className="text-sm text-slate-600">
-            Connect your Google account to pick which calendars are shared with the agent. Primary will always be
-            included with aliases.
+            Connect your Google account to pick which calendars are shared with
+            the agent. Primary will always be included with aliases.
           </p>
         )}
       </InfoCard>
