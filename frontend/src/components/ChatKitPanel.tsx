@@ -3,6 +3,7 @@ import { ChatKit, useChatKit } from "@openai/chatkit-react";
 import { createClientSecretFetcher, workflowId } from "../lib/chatkitSession";
 import { VoiceToggleButton } from "./VoiceToggleButton";
 import { useVoiceMode } from "../hooks/useVoiceMode";
+import { useVoicePlayback } from "../hooks/useVoicePlayback";
 
 type Props = {
   className?: string;
@@ -50,6 +51,7 @@ export function ChatKitPanel({ className }: Props) {
   );
 
   const voice = useVoiceMode({ onTranscription: handleVoiceText });
+  useVoicePlayback({ enabled: voice.active, chatkitRef: chatkit.ref });
 
   return (
     <div className={`relative w-full ${className ?? ""}`}>
