@@ -1,4 +1,4 @@
-"""Configuration helpers for the Managed ChatKit backend."""
+"""Configuration helpers for the Realtime voice assistant backend."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ from functools import lru_cache
 from typing import List
 from zoneinfo import ZoneInfo
 
-DEFAULT_CHATKIT_BASE = "https://api.openai.com"
-SESSION_COOKIE_NAME = "chatkit_session_id"
+DEFAULT_REALTIME_BASE = "https://api.openai.com"
+SESSION_COOKIE_NAME = "realtime_session_id"
 SESSION_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30  # 30 days
 
 
@@ -21,28 +21,33 @@ def timezone() -> ZoneInfo:
         return ZoneInfo("UTC")
 
 
-def chatkit_api_base() -> str:
+def realtime_api_base() -> str:
     return (
-        os.getenv("CHATKIT_API_BASE")
-        or os.getenv("VITE_CHATKIT_API_BASE")
-        or DEFAULT_CHATKIT_BASE
+        os.getenv("REALTIME_API_BASE")
+        or os.getenv("VITE_REALTIME_API_BASE")
+        or DEFAULT_REALTIME_BASE
     )
 
 
-def workflow_id() -> str | None:
-    env_value = os.getenv("CHATKIT_WORKFLOW_ID") or os.getenv(
-        "VITE_CHATKIT_WORKFLOW_ID"
-    )
+def realtime_prompt_id() -> str | None:
+    env_value = os.getenv("REALTIME_PROMPT_ID") or os.getenv("VITE_REALTIME_PROMPT_ID")
     if env_value and env_value.strip():
         return env_value.strip()
     return None
 
 
-def workflow_version() -> str | None:
-    raw = os.getenv("CHATKIT_WORKFLOW_VERSION")
+def realtime_model() -> str:
+    raw = os.getenv("REALTIME_MODEL") or os.getenv("VITE_REALTIME_MODEL")
     if raw and raw.strip():
         return raw.strip()
-    return None
+    return "gpt-4o-realtime-preview-2025-06-03"
+
+
+def realtime_voice() -> str:
+    raw = os.getenv("REALTIME_VOICE") or os.getenv("VITE_REALTIME_VOICE")
+    if raw and raw.strip():
+        return raw.strip()
+    return "alloy"
 
 
 def organization() -> str | None:

@@ -44,12 +44,12 @@ export function LoginForm({ onLogin }: Props) {
       <div>
         <label className="block text-sm font-medium text-slate-700">Name (optional)</label>
         <input
-          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-inner focus:border-slate-900 focus:outline-none"
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Display name in ChatKit"
-        />
+        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-inner focus:border-slate-900 focus:outline-none"
+        type="text"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="Display name for the assistant"
+      />
       </div>
       {error ? <p className="text-sm text-amber-700">{error}</p> : null}
       <div className="flex items-center justify-end">

@@ -1,1 +1,1 @@
-"""Managed ChatKit backend package."""
+"""Realtime voice assistant backend package."""

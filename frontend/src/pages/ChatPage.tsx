@@ -1,18 +1,19 @@
-import { ChatKitPanel } from "../components/ChatKitPanel";
-import { InfoCard } from "../components/InfoCard";
 import type { SessionState } from "../types";
+import { RealtimePanel } from "../components/RealtimePanel";
 
 type Props = {
   session: SessionState;
 };
 
 export function ChatPage({ session }: Props) {
-  const workflowId = session.workflow?.id || "Not configured";
-  const workflowVersion = session.workflow?.version || "latest";
-
   return (
     <div className="w-full h-[calc(100svh-56px)] mx-auto flex max-w-6xl flex-col">
-      <ChatKitPanel className="h-full" />
+      <RealtimePanel
+        className="h-full"
+        promptId={session.prompt?.id ?? undefined}
+        model={session.realtime?.model ?? undefined}
+        voice={session.realtime?.voice ?? undefined}
+      />
     </div>
   );
 }

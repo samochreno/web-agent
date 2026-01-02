@@ -35,7 +35,8 @@ export default function App() {
         error: null,
         user: next.user ?? null,
         google: next.google ?? { connected: false, email: null, expires_at: null },
-        workflow: next.workflow,
+        prompt: next.prompt,
+        realtime: next.realtime,
       });
     } catch (err) {
       setSession((prev) => ({

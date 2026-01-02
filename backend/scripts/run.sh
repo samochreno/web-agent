@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Start the Managed ChatKit FastAPI backend.
+# Start the Realtime assistant FastAPI backend.
 
 set -euo pipefail
 
@@ -42,5 +42,5 @@ fi
 
 export PYTHONPATH="$PROJECT_ROOT${PYTHONPATH:+:$PYTHONPATH}"
 
-echo "Starting Managed ChatKit backend on http://127.0.0.1:8000 ..."
+echo "Starting Realtime assistant backend on http://127.0.0.1:8000 ..."
 exec uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
