@@ -89,12 +89,12 @@ export function useVoiceMode({ onTranscription }: Props) {
 
       // Use the default device, or you can hardcode a deviceId here
       // const preferredDeviceId = audioInputs[0]?.deviceId; // Change index to pick different mic
-      const preferredDeviceId = undefined; // undefined = system default
+      const preferredDeviceId: string | undefined = undefined; // undefined = system default
 
       if (preferredDeviceId) {
         console.log(
           "[VAD] Using device:",
-          preferredDeviceId.slice(0, 8) + "..."
+          preferredDeviceId
         );
       } else {
         console.log("[VAD] Using system default microphone");

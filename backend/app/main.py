@@ -10,7 +10,7 @@ from typing import Any, Mapping, Tuple
 import httpx
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
 from . import config
@@ -248,6 +248,133 @@ async def transcriptions(file: UploadFile = File(...)) -> JSONResponse:
     return respond({"text": text}, 200)
 
 
+@app.post("/api/speech")
+async def speech(request: Request) -> JSONResponse | StreamingResponse:
+    api_key = read_string(os.getenv("OPENAI_API_KEY"))
+    if not api_key:
+        return respond({"error": "Missing OPENAI_API_KEY environment variable"}, 500)
+
+    body = await read_json_body(request)
+    text = read_string(body.get("text")) or read_string(body.get("message"))
+    if not text:
+        return respond({"error": "Text is required"}, 400)
+
+    voice = read_string(body.get("voice")) or "alloy"
+    response_format = read_string(body.get("format")) or "mp3"
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    organization = config.organization()
+    if organization:
+        headers["OpenAI-Organization"] = organization
+
+    payload = {
+        "model": "gpt-4o-mini-tts",
+        "input": text,
+        "voice": voice,
+        "response_format": response_format,
+        "stream": True,
+    }
+
+    api_base = config.chatkit_api_base().rstrip("/")
+    try:
+        async with httpx.AsyncClient(timeout=None, base_url=api_base) as client:
+            try:
+                upstream = await client.stream(
+                    "POST", "/v1/audio/speech", headers=headers, json=payload
+                )
+            except httpx.RequestError as error:
+                return respond({"error": f"Speech request failed: {error}"}, 502)
+
+            if not upstream.is_success:
+                detail = await upstream.aread()
+                message = None
+                try:
+                    parsed_error = json.loads(detail.decode("utf-8")) if detail else None
+                    if isinstance(parsed_error, Mapping):
+                        message = parsed_error.get("error") or parsed_error.get("message")
+                except Exception:
+                    message = None
+                await upstream.aclose()
+                return respond(
+                    {"error": message or upstream.reason_phrase or "Failed to synthesize speech"},
+                    upstream.status_code,
+                )
+
+            content_type = upstream.headers.get("content-type") or "audio/mpeg"
+
+            async def audio_stream():
+                try:
+                    async for chunk in upstream.aiter_bytes():
+                        if chunk:
+                            yield chunk
+                finally:
+                    await upstream.aclose()
+
+            return StreamingResponse(audio_stream(), media_type=content_type)
+    except httpx.RequestError as error:
+        return respond({"error": f"Speech request failed: {error}"}, 502)
+
+
+@app.get("/api/threads/{thread_id}/latest-assistant")
+async def latest_assistant_message(thread_id: str) -> JSONResponse:
+    api_key = read_string(os.getenv("OPENAI_API_KEY"))
+    if not api_key:
+        return respond({"error": "Missing OPENAI_API_KEY environment variable"}, 500)
+
+    if not thread_id.strip():
+        return respond({"error": "Thread ID is required"}, 400)
+
+    api_base = config.chatkit_api_base().rstrip("/")
+    headers = {"Authorization": f"Bearer {api_key}"}
+    organization = config.organization()
+    if organization:
+        headers["OpenAI-Organization"] = organization
+
+    if thread_id.startswith("cthr_"):
+        headers["OpenAI-Beta"] = "chatkit_beta=v1"
+        url = f"{api_base}/v1/chatkit/threads/{thread_id}/items"
+        params = {"order": "desc", "limit": 10}
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                upstream = await client.get(url, headers=headers, params=params)
+        except httpx.RequestError as error:
+            return respond({"error": f"Failed to fetch thread items: {error}"}, 502)
+        payload = parse_json(upstream)
+        if not upstream.is_success:
+            message = payload.get("error") if isinstance(payload, Mapping) else None
+            message = message or upstream.reason_phrase or "Failed to load thread messages"
+            return respond({"error": message}, upstream.status_code)
+        items = payload.get("data") if isinstance(payload, Mapping) else None
+        if not isinstance(items, list):
+            return respond({"error": "Invalid message response shape"}, 502)
+        text = extract_chatkit_text(items)
+    else:
+        headers["OpenAI-Beta"] = "assistants=v2"
+        url = f"{api_base}/v1/threads/{thread_id}/messages"
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                upstream = await client.get(url, headers=headers, params={"order": "desc", "limit": 10})
+        except httpx.RequestError as error:
+            return respond({"error": f"Failed to fetch thread messages: {error}"}, 502)
+        payload = parse_json(upstream)
+        if not upstream.is_success:
+            message = payload.get("error") if isinstance(payload, Mapping) else None
+            message = message or upstream.reason_phrase or "Failed to load thread messages"
+            return respond({"error": message}, upstream.status_code)
+        messages = payload.get("data") if isinstance(payload, Mapping) else None
+        if not isinstance(messages, list):
+            return respond({"error": "Invalid message response shape"}, 502)
+        text = extract_assistant_text(messages)
+
+    if not text:
+        return respond({"error": "No assistant message found"}, 404)
+
+    return respond({"text": text}, 200)
+
+
 @app.get("/api/calendars")
 async def calendars(request: Request) -> JSONResponse:
     session_id, session, needs_cookie = ensure_session(request)
@@ -412,6 +539,41 @@ def parse_json(response: httpx.Response) -> Mapping[str, Any]:
         return parsed if isinstance(parsed, Mapping) else {}
     except (json.JSONDecodeError, httpx.DecodingError):
         return {}
+
+
+def extract_assistant_text(messages: list[Any]) -> str | None:
+    for message in messages:
+        if not isinstance(message, Mapping):
+            continue
+        if message.get("role") != "assistant":
+            continue
+        content = message.get("content")
+        if isinstance(content, list):
+            for part in content:
+                if isinstance(part, Mapping) and part.get("type") == "text":
+                    inner = part.get("text")
+                    if isinstance(inner, Mapping) and isinstance(inner.get("value"), str):
+                        return inner["value"].strip()
+    return None
+
+
+def extract_chatkit_text(items: list[Any]) -> str | None:
+    for item in items:
+        if not isinstance(item, Mapping):
+            continue
+        if item.get("type") != "assistant_message":
+            continue
+        content = item.get("content")
+        if isinstance(content, list):
+            for part in content:
+                if isinstance(part, Mapping):
+                    if part.get("type") == "text":
+                        value = part.get("text")
+                        if isinstance(value, Mapping) and isinstance(value.get("value"), str):
+                            return value["value"].strip()
+                    if part.get("type") == "output_text" and isinstance(part.get("text"), str):
+                        return part["text"].strip()
+    return None
 
 
 async def read_json_body(request: Request) -> Mapping[str, Any]:
