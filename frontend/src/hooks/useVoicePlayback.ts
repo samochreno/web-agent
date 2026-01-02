@@ -190,7 +190,10 @@ export function useVoicePlayback({
       });
       const payload = (await response.json().catch(() => ({}))) as { text?: string; error?: string };
       if (!response.ok) {
-        console.warn("Failed to load latest assistant message:", payload.error ?? response.statusText);
+        const message = payload.error ?? response.statusText;
+        if (message) {
+          console.warn("Failed to load latest assistant message:", message);
+        }
         return;
       }
       await speakText(payload.text ?? null);
