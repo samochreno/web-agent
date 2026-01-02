@@ -10,7 +10,7 @@ from typing import Any, Mapping, Tuple
 import httpx
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
 from . import config
@@ -246,6 +246,76 @@ async def transcriptions(file: UploadFile = File(...)) -> JSONResponse:
         return respond({"error": "Missing transcription text in response"}, 502)
 
     return respond({"text": text}, 200)
+
+
+@app.post("/api/speech")
+async def speech(request: Request) -> JSONResponse | StreamingResponse:
+    api_key = read_string(os.getenv("OPENAI_API_KEY"))
+    if not api_key:
+        return respond({"error": "Missing OPENAI_API_KEY environment variable"}, 500)
+
+    body = await read_json_body(request)
+    text = read_string(body.get("text")) or read_string(body.get("message"))
+    if not text:
+        return respond({"error": "Text is required"}, 400)
+
+    voice = read_string(body.get("voice")) or "alloy"
+    response_format = read_string(body.get("format")) or "mp3"
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    organization = config.organization()
+    if organization:
+        headers["OpenAI-Organization"] = organization
+
+    payload = {
+        "model": "gpt-4o-mini-tts",
+        "input": text,
+        "voice": voice,
+        "response_format": response_format,
+        "stream": True,
+    }
+
+    api_base = config.chatkit_api_base().rstrip("/")
+    try:
+        async with httpx.AsyncClient(timeout=None, base_url=api_base) as client:
+            try:
+                upstream = await client.stream(
+                    "POST", "/v1/audio/speech", headers=headers, json=payload
+                )
+            except httpx.RequestError as error:
+                return respond({"error": f"Speech request failed: {error}"}, 502)
+
+            if not upstream.is_success:
+                detail = await upstream.aread()
+                message = None
+                try:
+                    parsed_error = json.loads(detail.decode("utf-8")) if detail else None
+                    if isinstance(parsed_error, Mapping):
+                        message = parsed_error.get("error") or parsed_error.get("message")
+                except Exception:
+                    message = None
+                await upstream.aclose()
+                return respond(
+                    {"error": message or upstream.reason_phrase or "Failed to synthesize speech"},
+                    upstream.status_code,
+                )
+
+            content_type = upstream.headers.get("content-type") or "audio/mpeg"
+
+            async def audio_stream():
+                try:
+                    async for chunk in upstream.aiter_bytes():
+                        if chunk:
+                            yield chunk
+                finally:
+                    await upstream.aclose()
+
+            return StreamingResponse(audio_stream(), media_type=content_type)
+    except httpx.RequestError as error:
+        return respond({"error": f"Speech request failed: {error}"}, 502)
 
 
 @app.get("/api/calendars")
