@@ -1,4 +1,4 @@
-"""FastAPI entrypoint for ChatKit sessions, tool calls, and Google connectivity."""
+"""FastAPI entrypoint for Realtime sessions, tool calls, and Google connectivity."""
 
 from __future__ import annotations
 
@@ -26,10 +26,9 @@ from .google import (
 )
 from .models import SessionData, UserProfile
 from .sessions import SessionStore
-from .state import ChatKitStateService
 from .tools import ToolExecutor
 
-app = FastAPI(title="Managed ChatKit Session API")
+app = FastAPI(title="Realtime Assistant API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -43,7 +42,7 @@ SESSION_STORE = SessionStore()
 TASKS_SERVICE = GoogleTasksService()
 CALENDAR_SERVICE = GoogleCalendarService()
 VISIBILITY_SERVICE = CalendarVisibilityService(CALENDAR_SERVICE)
-STATE_SERVICE = ChatKitStateService(TASKS_SERVICE)
+# Keep state service available for future per-session metadata if needed.
 TOOL_EXECUTOR = ToolExecutor(TASKS_SERVICE, CALENDAR_SERVICE, VISIBILITY_SERVICE)
 
 
@@ -58,7 +57,8 @@ async def auth_session(request: Request) -> JSONResponse:
     payload = {
         "user": serialize_user(session.user),
         "google": serialize_google(session),
-        "workflow": {"id": config.workflow_id(), "version": config.workflow_version()},
+        "prompt": {"id": config.realtime_prompt_id()},
+        "realtime": {"model": config.realtime_model(), "voice": config.realtime_voice()},
     }
     return respond(payload, 200, session_id if needs_cookie else None, needs_cookie)
 
@@ -86,31 +86,32 @@ async def logout(request: Request) -> JSONResponse:
     return respond({"ok": True}, 200, session_id if needs_cookie else None, needs_cookie)
 
 
-@app.post("/api/create-session")
-async def create_session(request: Request) -> JSONResponse:
-    """Exchange a workflow id for a ChatKit client secret."""
+@app.post("/api/realtime/session")
+async def create_realtime_session(request: Request) -> JSONResponse:
+    """Exchange a prompt id for a Realtime client secret and websocket URL."""
     api_key = read_string(os.getenv("OPENAI_API_KEY"))
     if not api_key:
         return respond({"error": "Missing OPENAI_API_KEY environment variable"}, 500)
 
     session_id, session, needs_cookie = ensure_session(request)
     body = await read_json_body(request)
-    workflow_id = resolve_workflow_id(body)
-    if not workflow_id:
-        return respond({"error": "Missing workflow id"}, 400, session_id if needs_cookie else None, needs_cookie)
+    prompt_id = resolve_prompt_id(body)
+    if not prompt_id:
+        return respond({"error": "Missing prompt id"}, 400, session_id if needs_cookie else None, needs_cookie)
 
-    user_identifier = session.user.id if session.user else session_id
-    api_base = config.chatkit_api_base()
-    workflow_payload = {
-        "id": workflow_id,
-        "version": config.workflow_version(),
-        "state_variables": STATE_SERVICE.variables(session.google, session),
+    api_base = config.realtime_api_base().rstrip("/")
+    payload = {
+        "model": config.realtime_model(),
+        "voice": config.realtime_voice(),
+        "modalities": ["text", "audio"],
+        "prompt": {"id": prompt_id},
+        "input_audio_transcription": {"model": "whisper-1"},
     }
 
     headers = {
         "Authorization": f"Bearer {api_key}",
-        "OpenAI-Beta": "chatkit_beta=v1",
         "Content-Type": "application/json",
+        "OpenAI-Beta": "realtime=v1",
     }
     organization = config.organization()
     if organization:
@@ -118,28 +119,25 @@ async def create_session(request: Request) -> JSONResponse:
 
     try:
         async with httpx.AsyncClient(base_url=api_base, timeout=10.0) as client:
-            upstream = await client.post(
-                "/v1/chatkit/sessions",
-                headers=headers,
-                json={"workflow": workflow_payload, "user": user_identifier},
-            )
+            upstream = await client.post("/v1/realtime/sessions", headers=headers, json=payload)
     except httpx.RequestError as error:
         return respond(
-            {"error": f"Failed to reach ChatKit API: {error}"},
+            {"error": f"Failed to reach Realtime API: {error}"},
             502,
             session_id if needs_cookie else None,
             needs_cookie,
         )
 
-    payload = parse_json(upstream)
+    parsed = parse_json(upstream)
     if not upstream.is_success:
-        message = payload.get("error") if isinstance(payload, Mapping) else None
+        message = parsed.get("error") if isinstance(parsed, Mapping) else None
         message = message or upstream.reason_phrase or "Failed to create session"
         return respond({"error": message}, upstream.status_code, session_id if needs_cookie else None, needs_cookie)
 
-    client_secret = payload.get("client_secret") if isinstance(payload, Mapping) else None
-    expires_after = payload.get("expires_after") if isinstance(payload, Mapping) else None
-    if not client_secret:
+    client_secret = parsed.get("client_secret") if isinstance(parsed, Mapping) else None
+    expires_after = parsed.get("expires_after") if isinstance(parsed, Mapping) else None
+    ws_url = parsed.get("url") if isinstance(parsed, Mapping) else None
+    if not client_secret or not isinstance(client_secret, Mapping) or "value" not in client_secret:
         return respond(
             {"error": "Missing client secret in response"},
             502,
@@ -149,16 +147,22 @@ async def create_session(request: Request) -> JSONResponse:
 
     SESSION_STORE.reset_aliases(session_id)
     return respond(
-        {"client_secret": client_secret, "expires_after": expires_after},
+        {
+            "client_secret": client_secret,
+            "expires_after": expires_after,
+            "url": ws_url,
+            "model": config.realtime_model(),
+            "voice": config.realtime_voice(),
+            "prompt_id": prompt_id,
+        },
         200,
         session_id if needs_cookie else None,
         needs_cookie,
     )
 
 
-@app.post("/api/chatkit/tool")
-@app.post("/chatkit/tool")
-async def chatkit_tool(request: Request) -> JSONResponse:
+@app.post("/api/realtime/tool")
+async def realtime_tool(request: Request) -> JSONResponse:
     session_id, session, needs_cookie = ensure_session(request)
     body = await read_json_body(request)
     name = read_string(body.get("name"))
@@ -369,17 +373,17 @@ async def read_json_body(request: Request) -> Mapping[str, Any]:
     return parsed if isinstance(parsed, Mapping) else {}
 
 
-def resolve_workflow_id(body: Mapping[str, Any]) -> str | None:
-    workflow = body.get("workflow", {})
-    workflow_id = None
-    if isinstance(workflow, Mapping):
-        workflow_id = workflow.get("id")
-    workflow_id = workflow_id or body.get("workflowId")
-    env_workflow = config.workflow_id()
-    if not workflow_id and env_workflow:
-        workflow_id = env_workflow
-    if workflow_id and isinstance(workflow_id, str) and workflow_id.strip():
-        return workflow_id.strip()
+def resolve_prompt_id(body: Mapping[str, Any]) -> str | None:
+    prompt = body.get("prompt", {})
+    prompt_id = None
+    if isinstance(prompt, Mapping):
+        prompt_id = prompt.get("id")
+    prompt_id = prompt_id or body.get("prompt_id") or body.get("promptId")
+    env_prompt = config.realtime_prompt_id()
+    if not prompt_id and env_prompt:
+        prompt_id = env_prompt
+    if prompt_id and isinstance(prompt_id, str) and prompt_id.strip():
+        return prompt_id.strip()
     return None
 
 

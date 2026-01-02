@@ -1,11 +1,12 @@
 export type UserProfile = { id: string; email: string; name?: string | null };
 export type GoogleStatus = { connected: boolean; email?: string | null; expires_at?: string | null };
-export type WorkflowInfo = { id?: string | null; version?: string | null };
+export type PromptInfo = { id?: string | null };
 
 export type SessionResponse = {
   user?: UserProfile | null;
   google?: GoogleStatus;
-  workflow?: WorkflowInfo;
+  prompt?: PromptInfo;
+  realtime?: { model?: string | null; voice?: string | null };
 };
 
 export type CalendarOption = {
@@ -66,5 +67,21 @@ export async function updateVisibleCalendars(calendars: string[]) {
   return fetchJson<{ calendars: CalendarOption[] }>("/api/calendars/visible", {
     method: "POST",
     body: JSON.stringify({ calendars }),
+  });
+}
+
+export type RealtimeSessionConfig = {
+  client_secret: { value: string; expires_at?: number | string | null };
+  url?: string | null;
+  expires_after?: number | null;
+  model?: string;
+  voice?: string;
+  prompt_id?: string;
+};
+
+export async function createRealtimeSession(promptId?: string): Promise<RealtimeSessionConfig> {
+  return fetchJson<RealtimeSessionConfig>("/api/realtime/session", {
+    method: "POST",
+    body: JSON.stringify(promptId ? { prompt: { id: promptId } } : {}),
   });
 }

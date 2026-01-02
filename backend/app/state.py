@@ -9,7 +9,7 @@ from .models import GoogleConnection, SessionData
 from .utils import now
 
 
-class ChatKitStateService:
+class RealtimeStateService:
     def __init__(self, tasks_service: GoogleTasksService) -> None:
         self.tasks_service = tasks_service
 
