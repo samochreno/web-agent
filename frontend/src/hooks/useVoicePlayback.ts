@@ -239,6 +239,9 @@ export function useVoicePlayback({
         credentials: "include",
       });
       const payload = (await response.json().catch(() => ({}))) as { text?: string; error?: string };
+      if (response.status === 404) {
+        return;
+      }
       if (!response.ok) {
         const message = payload.error ?? response.statusText;
         if (message) console.warn("Failed to load latest assistant message:", message);
