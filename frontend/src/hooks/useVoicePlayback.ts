@@ -218,7 +218,9 @@ export function useVoicePlayback({
         const detail = (event as CustomEvent<{ threadId: string | null }>).detail;
         setThreadId(detail?.threadId ?? null);
       };
-      const onResponseStart = () => stop();
+      const onResponseStart = () => {
+        stop();
+      };
       const onResponseEnd = () => {
         void fetchLatestAssistant();
       };
