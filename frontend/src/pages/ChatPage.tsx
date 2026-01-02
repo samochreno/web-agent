@@ -1,5 +1,4 @@
 import { ChatKitPanel } from "../components/ChatKitPanel";
-import { InfoCard } from "../components/InfoCard";
 import type { SessionState } from "../types";
 
 type Props = {
@@ -7,11 +6,13 @@ type Props = {
 };
 
 export function ChatPage({ session }: Props) {
-  const workflowId = session.workflow?.id || "Not configured";
-  const workflowVersion = session.workflow?.version || "latest";
+  const workflowId = session.workflow?.id ?? "unknown";
 
   return (
-    <div className="w-full h-[calc(100svh-56px)] mx-auto flex max-w-6xl flex-col">
+    <div
+      className="w-full h-[calc(100svh-56px)] mx-auto flex max-w-6xl flex-col"
+      data-workflow-id={workflowId}
+    >
       <ChatKitPanel className="h-full" />
     </div>
   );

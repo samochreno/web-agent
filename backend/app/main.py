@@ -8,7 +8,7 @@ import uuid
 from typing import Any, Mapping, Tuple
 
 import httpx
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from starlette.concurrency import run_in_threadpool
@@ -193,6 +193,59 @@ async def chatkit_tool(request: Request) -> JSONResponse:
         return respond({"error": str(exc)}, 422, session_id if needs_cookie else None, needs_cookie)
 
     return respond({"result": result}, 200, session_id if needs_cookie else None, needs_cookie)
+
+
+@app.post("/api/transcriptions")
+async def transcriptions(file: UploadFile = File(...)) -> JSONResponse:
+    api_key = read_string(os.getenv("OPENAI_API_KEY"))
+    if not api_key:
+        return respond({"error": "Missing OPENAI_API_KEY environment variable"}, 500)
+
+    audio_bytes = await file.read()
+    if not audio_bytes:
+        return respond({"error": "Audio file is empty"}, 400)
+
+    headers = {"Authorization": f"Bearer {api_key}"}
+    organization = config.organization()
+    if organization:
+        headers["OpenAI-Organization"] = organization
+
+    files = {
+        "file": (
+            file.filename or "speech.wav",
+            audio_bytes,
+            file.content_type or "audio/wav",
+        )
+    }
+
+    data = {
+        "model": "gpt-4o-transcribe",
+        "language": "sk",
+    }
+
+    api_base = config.chatkit_api_base().rstrip("/")
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            upstream = await client.post(
+                f"{api_base}/v1/audio/transcriptions",
+                headers=headers,
+                files=files,
+                data=data,
+            )
+    except httpx.RequestError as error:
+        return respond({"error": f"Transcription request failed: {error}"}, 502)
+
+    payload = parse_json(upstream)
+    if not upstream.is_success:
+        message = payload.get("error") if isinstance(payload, Mapping) else None
+        message = message or upstream.reason_phrase or "Failed to transcribe audio"
+        return respond({"error": message}, upstream.status_code)
+
+    text = payload.get("text") if isinstance(payload, Mapping) else None
+    if not text:
+        return respond({"error": "Missing transcription text in response"}, 502)
+
+    return respond({"text": text}, 200)
 
 
 @app.get("/api/calendars")
