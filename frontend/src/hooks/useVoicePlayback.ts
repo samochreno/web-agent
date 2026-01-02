@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type RefObject } from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import type { OpenAIChatKit } from "@openai/chatkit";
 
 type Options = {
@@ -9,55 +9,6 @@ type Options = {
 };
 
 type Cleanup = () => void;
-
-function extractAssistantText(detail: unknown): string | null {
-  if (!detail || typeof detail !== "object") return null;
-  const fromPath = (path: Array<string | number>): string | null => {
-    let current: unknown = detail;
-    for (const key of path) {
-      if (Array.isArray(current) && typeof key === "number") {
-        current = current[key];
-        continue;
-      }
-      if (current && typeof current === "object" && typeof key === "string" && key in current) {
-        current = (current as Record<string, unknown>)[key];
-        continue;
-      }
-      return null;
-    }
-    return typeof current === "string" ? current : null;
-  };
-
-  const candidates = [
-    fromPath(["item", "content", 0, "text", "value"]),
-    fromPath(["message", "content", 0, "text", "value"]),
-    fromPath(["content", 0, "text", "value"]),
-    fromPath(["text"]),
-    fromPath(["message", "text"]),
-  ];
-
-  for (const candidate of candidates) {
-    if (candidate && candidate.trim()) return candidate.trim();
-  }
-
-  return null;
-}
-
-function extractId(detail: unknown): string | null {
-  if (!detail || typeof detail !== "object") return null;
-  const potentialIds: unknown[] = [
-    (detail as { id?: unknown }).id,
-    (detail as { item?: { id?: unknown } }).item?.id,
-    (detail as { message?: { id?: unknown } }).message?.id,
-    (detail as { data?: { id?: unknown } }).data?.id,
-  ];
-  for (const candidate of potentialIds) {
-    if (typeof candidate === "string" && candidate.trim()) {
-      return candidate.trim();
-    }
-  }
-  return null;
-}
 
 async function playStreamingAudio(response: Response): Promise<Cleanup> {
   const mimeType = response.headers.get("content-type")?.split(";")[0] ?? "audio/mpeg";
@@ -197,8 +148,8 @@ export function useVoicePlayback({
   format = "mp3",
 }: Options) {
   const cleanupRef = useRef<Cleanup | null>(null);
-  const seenIds = useRef<Set<string>>(new Set());
   const attachedElement = useRef<OpenAIChatKit | null>(null);
+  const [threadId, setThreadId] = useState<string | null>(null);
 
   const stop = useCallback(() => {
     if (cleanupRef.current) {
@@ -208,8 +159,8 @@ export function useVoicePlayback({
   }, []);
 
   const speakText = useCallback(
-    async (text: string) => {
-      if (!enabled || !text.trim()) return;
+    async (text: string | null) => {
+      if (!enabled || !text || !text.trim()) return;
       stop();
       try {
         const response = await fetch("/api/speech", {
@@ -230,22 +181,27 @@ export function useVoicePlayback({
     [enabled, format, stop, voice]
   );
 
-  const handleAssistantDetail = useCallback(
-    (detail: unknown) => {
-      const id = extractId(detail);
-      if (id && seenIds.current.has(id)) return;
-      const text = extractAssistantText(detail);
-      if (!text) return;
-      if (id) seenIds.current.add(id);
-      void speakText(text);
-    },
-    [speakText]
-  );
+  const fetchLatestAssistant = useCallback(async () => {
+    if (!threadId) return;
+    try {
+      const response = await fetch(`/api/threads/${encodeURIComponent(threadId)}/latest-assistant`, {
+        method: "GET",
+        credentials: "include",
+      });
+      const payload = (await response.json().catch(() => ({}))) as { text?: string; error?: string };
+      if (!response.ok) {
+        console.warn("Failed to load latest assistant message:", payload.error ?? response.statusText);
+        return;
+      }
+      await speakText(payload.text ?? null);
+    } catch (err) {
+      console.error("Unable to fetch latest assistant message", err);
+    }
+  }, [speakText, threadId]);
 
   useEffect(() => {
     if (!enabled) {
       stop();
-      seenIds.current.clear();
     }
   }, [enabled, stop]);
 
@@ -258,24 +214,23 @@ export function useVoicePlayback({
       if (!element || element === attachedElement.current) return;
       attachedElement.current = element;
 
-      const onAssistantMessage = (event: Event) =>
-        handleAssistantDetail((event as CustomEvent<unknown>).detail);
-      const onEffect = (event: Event) => {
-        const detail = (event as CustomEvent<{ name?: string; data?: unknown }>).detail;
-        if (detail?.name === "speak" || detail?.name === "voice") {
-          handleAssistantDetail(detail.data);
-        }
+      const onThreadChange = (event: Event) => {
+        const detail = (event as CustomEvent<{ threadId: string | null }>).detail;
+        setThreadId(detail?.threadId ?? null);
       };
       const onResponseStart = () => stop();
+      const onResponseEnd = () => {
+        void fetchLatestAssistant();
+      };
 
-      element.addEventListener("thread.item.assistant_message", onAssistantMessage as EventListener);
-      element.addEventListener("chatkit.effect", onEffect as EventListener);
+      element.addEventListener("chatkit.thread.change", onThreadChange as EventListener);
       element.addEventListener("chatkit.response.start", onResponseStart as EventListener);
+      element.addEventListener("chatkit.response.end", onResponseEnd as EventListener);
 
       detach = () => {
-        element.removeEventListener("thread.item.assistant_message", onAssistantMessage as EventListener);
-        element.removeEventListener("chatkit.effect", onEffect as EventListener);
+        element.removeEventListener("chatkit.thread.change", onThreadChange as EventListener);
         element.removeEventListener("chatkit.response.start", onResponseStart as EventListener);
+        element.removeEventListener("chatkit.response.end", onResponseEnd as EventListener);
         if (attachedElement.current === element) {
           attachedElement.current = null;
         }
@@ -293,7 +248,7 @@ export function useVoicePlayback({
       if (detach) detach();
       window.clearInterval(interval);
     };
-  }, [chatkitRef, handleAssistantDetail, stop]);
+  }, [chatkitRef, fetchLatestAssistant, stop]);
 
   return { speakText, stop };
 }

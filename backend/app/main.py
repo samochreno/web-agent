@@ -318,6 +318,65 @@ async def speech(request: Request) -> JSONResponse | StreamingResponse:
         return respond({"error": f"Speech request failed: {error}"}, 502)
 
 
+@app.get("/api/threads/{thread_id}/latest-assistant")
+async def latest_assistant_message(thread_id: str) -> JSONResponse:
+    api_key = read_string(os.getenv("OPENAI_API_KEY"))
+    if not api_key:
+        return respond({"error": "Missing OPENAI_API_KEY environment variable"}, 500)
+
+    if not thread_id.strip():
+        return respond({"error": "Thread ID is required"}, 400)
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "OpenAI-Beta": "assistants=v2",
+    }
+    organization = config.organization()
+    if organization:
+        headers["OpenAI-Organization"] = organization
+
+    api_base = config.chatkit_api_base().rstrip("/")
+    url = f"{api_base}/v1/threads/{thread_id}/messages"
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            upstream = await client.get(url, headers=headers, params={"order": "desc", "limit": 10})
+    except httpx.RequestError as error:
+        return respond({"error": f"Failed to fetch thread messages: {error}"}, 502)
+
+    payload = parse_json(upstream)
+    if not upstream.is_success:
+        message = payload.get("error") if isinstance(payload, Mapping) else None
+        message = message or upstream.reason_phrase or "Failed to load thread messages"
+        return respond({"error": message}, upstream.status_code)
+
+    messages = payload.get("data") if isinstance(payload, Mapping) else None
+    if not isinstance(messages, list):
+        return respond({"error": "Invalid message response shape"}, 502)
+
+    text: str | None = None
+    for message in messages:
+        if not isinstance(message, Mapping):
+            continue
+        if message.get("role") != "assistant":
+            continue
+        content = message.get("content")
+        if isinstance(content, list):
+            for part in content:
+                if isinstance(part, Mapping) and part.get("type") == "text":
+                    inner = part.get("text")
+                    if isinstance(inner, Mapping) and isinstance(inner.get("value"), str):
+                        text = inner["value"].strip()
+                        break
+        if text:
+            break
+
+    if not text:
+        return respond({"error": "No assistant message found"}, 404)
+
+    return respond({"text": text}, 200)
+
+
 @app.get("/api/calendars")
 async def calendars(request: Request) -> JSONResponse:
     session_id, session, needs_cookie = ensure_session(request)
