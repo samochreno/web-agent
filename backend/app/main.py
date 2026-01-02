@@ -334,7 +334,7 @@ async def latest_assistant_message(thread_id: str) -> JSONResponse:
         headers["OpenAI-Organization"] = organization
 
     if thread_id.startswith("cthr_"):
-        headers["OpenAI-Beta"] = "chatkit_beta=v1"
+        headers["OpenAI-Beta"] = "chatkit=v1"
         url = f"{api_base}/v1/chatkit/threads/{thread_id}/items"
         params = {"order": "desc", "limit": 10}
         try:
