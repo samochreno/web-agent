@@ -44,6 +44,7 @@ CALENDAR_SERVICE = GoogleCalendarService()
 VISIBILITY_SERVICE = CalendarVisibilityService(CALENDAR_SERVICE)
 # Keep state service available for future per-session metadata if needed.
 TOOL_EXECUTOR = ToolExecutor(TASKS_SERVICE, CALENDAR_SERVICE, VISIBILITY_SERVICE)
+NON_GOOGLE_TOOLS = {"get_current_datetime", "web_search"}
 
 
 @app.get("/health")
@@ -165,7 +166,7 @@ async def realtime_tool(request: Request) -> JSONResponse:
         return respond({"error": "Tool name is required."}, 400, session_id if needs_cookie else None, needs_cookie)
 
     connection = session.google
-    if not connection:
+    if name not in NON_GOOGLE_TOOLS and not connection:
         return respond({"error": "Google is not connected."}, 403, session_id if needs_cookie else None, needs_cookie)
 
     raw_arguments = (

@@ -25,7 +25,8 @@ export const realtimeTools: RealtimeToolDefinition[] = [
   {
     type: "function",
     name: "list_task_lists",
-    description: "List Google task lists that the user has connected. Always refer to returned IDs as aliases.",
+    description:
+      "List Google task lists that the user has connected. Always refer to returned IDs as aliases.",
     parameters: { type: "object", properties: {}, additionalProperties: false },
   },
   {
@@ -36,14 +37,19 @@ export const realtimeTools: RealtimeToolDefinition[] = [
     parameters: {
       type: "object",
       properties: {
-        task_list_id: { type: "string", description: "Alias for the target task list." },
+        task_list_id: {
+          type: "string",
+          description: "Alias for the target task list.",
+        },
         start_date: {
           type: "string",
-          description: "Optional ISO date (YYYY-MM-DD) to include tasks due on or after this date.",
+          description:
+            "Optional ISO date (YYYY-MM-DD) to include tasks due on or after this date.",
         },
         end_date: {
           type: "string",
-          description: "Optional ISO date (YYYY-MM-DD) to include tasks due on or before this date.",
+          description:
+            "Optional ISO date (YYYY-MM-DD) to include tasks due on or before this date.",
         },
       },
       additionalProperties: false,
@@ -59,8 +65,14 @@ export const realtimeTools: RealtimeToolDefinition[] = [
       required: ["title"],
       properties: {
         title: { type: "string", description: "Task title." },
-        notes: { type: "string", description: "Optional task notes or details." },
-        task_list_id: { type: "string", description: "Alias of the task list to create the task in." },
+        notes: {
+          type: "string",
+          description: "Optional task notes or details.",
+        },
+        task_list_id: {
+          type: "string",
+          description: "Alias of the task list to create the task in.",
+        },
         due_date: {
           type: "string",
           description: "Optional due date in YYYY-MM-DD format.",
@@ -78,13 +90,20 @@ export const realtimeTools: RealtimeToolDefinition[] = [
       type: "object",
       required: ["task_id"],
       properties: {
-        task_id: { type: "string", description: "Alias for the task to update." },
-        task_list_id: { type: "string", description: "Alias for the task list that contains the task." },
+        task_id: {
+          type: "string",
+          description: "Alias for the task to update.",
+        },
+        task_list_id: {
+          type: "string",
+          description: "Alias for the task list that contains the task.",
+        },
         title: { type: "string", description: "Updated task title." },
         notes: { type: "string", description: "Updated notes or description." },
         due_date: {
           type: "string",
-          description: "Optional updated due date in YYYY-MM-DD format. Omit to leave unchanged; send empty string to clear.",
+          description:
+            "Optional updated due date in YYYY-MM-DD format. Omit to leave unchanged; send empty string to clear.",
         },
       },
       additionalProperties: false,
@@ -99,8 +118,14 @@ export const realtimeTools: RealtimeToolDefinition[] = [
       type: "object",
       required: ["start_date", "end_date"],
       properties: {
-        start_date: { type: "string", description: "Start of the window (YYYY-MM-DD)." },
-        end_date: { type: "string", description: "End of the window (YYYY-MM-DD)." },
+        start_date: {
+          type: "string",
+          description: "Start of the window (YYYY-MM-DD).",
+        },
+        end_date: {
+          type: "string",
+          description: "End of the window (YYYY-MM-DD).",
+        },
       },
       additionalProperties: false,
     },
@@ -119,20 +144,28 @@ export const realtimeTools: RealtimeToolDefinition[] = [
         location: { type: "string", description: "Optional event location." },
         start_datetime: {
           type: "string",
-          description: "ISO-8601 start datetime in the user's timezone (e.g., 2025-01-02T15:00).",
+          description:
+            "ISO-8601 start datetime in the user's timezone (e.g., 2025-01-02T15:00).",
         },
         end_datetime: {
           type: "string",
-          description: "ISO-8601 end datetime in the user's timezone (e.g., 2025-01-02T16:00).",
+          description:
+            "ISO-8601 end datetime in the user's timezone (e.g., 2025-01-02T16:00).",
         },
-        date: { type: "string", description: "Date for the event if using date + time inputs (YYYY-MM-DD)." },
+        date: {
+          type: "string",
+          description:
+            "Date for the event if using date + time inputs (YYYY-MM-DD).",
+        },
         start_time: {
           type: "string",
-          description: "Start time (HH:MM, 24-hour) used when start_datetime is not provided.",
+          description:
+            "Start time (HH:MM, 24-hour) used when start_datetime is not provided.",
         },
         end_time: {
           type: "string",
-          description: "End time (HH:MM, 24-hour) used when end_datetime is not provided.",
+          description:
+            "End time (HH:MM, 24-hour) used when end_datetime is not provided.",
         },
       },
       additionalProperties: false,
@@ -147,7 +180,10 @@ export const realtimeTools: RealtimeToolDefinition[] = [
       type: "object",
       required: ["event_id"],
       properties: {
-        event_id: { type: "string", description: "Alias for the event to update." },
+        event_id: {
+          type: "string",
+          description: "Alias for the event to update.",
+        },
         title: { type: "string", description: "Updated event title." },
         notes: { type: "string", description: "Updated description." },
         location: { type: "string", description: "Updated location." },
@@ -159,6 +195,19 @@ export const realtimeTools: RealtimeToolDefinition[] = [
           type: "string",
           description: "New end datetime in ISO-8601 format.",
         },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    type: "function",
+    name: "web_search",
+    description: "Performs a web search for the specified query.",
+    parameters: {
+      type: "object",
+      required: ["query"],
+      properties: {
+        query: { type: "string", description: "The search query." },
       },
       additionalProperties: false,
     },

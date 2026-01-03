@@ -1,14 +1,85 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta
 from typing import Any, Dict, Iterable, List, Mapping, Optional
 
+import httpx
+
 from .alias import AliasService
 from .calendar_visibility import CalendarVisibilityService
-from .config import google_default_duration_minutes, timezone
+from .config import google_default_duration_minutes, timezone, organization
 from .google import GoogleCalendarService, GoogleConnection, GoogleTasksService
 from .scheduling import resolve_event_window
 from .utils import parse_date_only, parse_local_datetime
+
+
+def web_search(query: str) -> Dict[str, Any]:
+    """Perform a web search using gpt-5-search-api with location set to Bratislava."""
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("Missing OPENAI_API_KEY environment variable")
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    org = organization()
+    if org:
+        headers["OpenAI-Organization"] = org
+
+    payload = {
+        "model": "gpt-5-search-api",
+        "web_search_options": {
+            "search_context_size": "high",
+        },
+        "messages": [
+            {
+                "role": "user",
+                "content": query,
+            }
+        ],
+    }
+
+    with httpx.Client(base_url="https://api.openai.com", timeout=60.0) as client:
+        response = client.post("/v1/chat/completions", headers=headers, json=payload)
+
+    if not response.is_success:
+        error_body = response.json() if response.headers.get("content-type", "").startswith("application/json") else {}
+        error_message = error_body.get("error", {}).get("message", response.text)
+        raise RuntimeError(f"Web search failed: {error_message}")
+
+    data = response.json()
+    choices = data.get("choices", [])
+    if not choices:
+        return {"text": "", "citations": []}
+
+    message = choices[0].get("message", {})
+    content = message.get("content", "")
+
+    # Extract citations from annotations if present
+    annotations = []
+    if isinstance(content, str):
+        text = content
+    else:
+        # Handle structured content with annotations
+        text = content
+        annotations = message.get("annotations", [])
+
+    citations = []
+    for annotation in annotations:
+        if annotation.get("type") == "url_citation":
+            citations.append({
+                "url": annotation.get("url"),
+                "title": annotation.get("title"),
+                "start_index": annotation.get("start_index"),
+                "end_index": annotation.get("end_index"),
+            })
+
+    return {
+        "text": text,
+        "citations": citations,
+    }
 
 
 class ToolExecutor:
@@ -30,6 +101,20 @@ class ToolExecutor:
         alias: AliasService,
         session,
     ) -> Dict[str, Any]:
+        if name == "get_current_datetime":
+            now = datetime.now(timezone())
+            return {
+                "date": now.strftime("%B %d, %Y"),
+                "time": now.strftime("%I:%M:%S %p %Z"),
+                "weekday": now.strftime("%A"),
+            }
+
+        if name == "web_search":
+            query = arguments.get("query")
+            if not query:
+                raise ValueError("query is required for web_search")
+            return web_search(query)
+
         if not connection:
             raise RuntimeError("Google is not connected.")
 
