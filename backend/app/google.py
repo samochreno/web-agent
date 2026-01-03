@@ -276,6 +276,8 @@ class GoogleTasksService:
                 body["due"] = due_value.astimezone().isoformat()
             elif due_value is None:
                 body["due"] = None
+        if "status" in payload:
+            body["status"] = payload["status"]
 
         updated = service.tasks().patch(tasklist=task_list_id, task=task_id, body=body).execute()
         return map_task(updated, config.timezone())

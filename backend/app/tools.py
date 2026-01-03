@@ -104,6 +104,9 @@ class ToolExecutor:
             due_value = arguments.get("due_date")
             payload["due"] = self._resolve_updated_due_date(due_value)
 
+        if "status" in arguments and arguments["status"] not in (None, ""):
+            payload["status"] = arguments["status"]
+
         task = self.tasks.update_task(connection, session, task_list_id, task_id, payload)
         return {
             "task_list_id": alias.register_task_list(task_list_id),
