@@ -2,7 +2,6 @@ import type { RefObject } from "react";
 
 export type RealtimeConnectionOptions = {
   apiBase: string;
-  model: string;
   clientSecret: string;
   audioElement: RefObject<HTMLAudioElement | null>;
   preferredCodec?: string;
@@ -15,7 +14,6 @@ export type RealtimeConnection = {
 
 export async function createRealtimeConnection({
   apiBase,
-  model,
   clientSecret,
   audioElement,
   preferredCodec = "opus",
@@ -28,7 +26,9 @@ export async function createRealtimeConnection({
     }
   };
 
-  const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const mediaStream = await navigator.mediaDevices.getUserMedia({
+    audio: true,
+  });
   const [microphoneTrack] = mediaStream.getAudioTracks();
   if (!microphoneTrack) {
     throw new Error("Microphone unavailable");
@@ -38,7 +38,8 @@ export async function createRealtimeConnection({
   const capabilities = RTCRtpSender.getCapabilities("audio");
   if (capabilities) {
     const codec = capabilities.codecs.find(
-      (c) => c.mimeType.toLowerCase() === `audio/${preferredCodec.toLowerCase()}`
+      (c) =>
+        c.mimeType.toLowerCase() === `audio/${preferredCodec.toLowerCase()}`
     );
     if (codec && pc.getTransceivers()[0]) {
       pc.getTransceivers()[0].setCodecPreferences([codec]);
@@ -51,7 +52,7 @@ export async function createRealtimeConnection({
   await pc.setLocalDescription(offer);
 
   const normalizedBase = apiBase.replace(/\/$/, "");
-  const sdpResponse = await fetch(`${normalizedBase}/v1/realtime?model=${encodeURIComponent(model)}`, {
+  const sdpResponse = await fetch(`${normalizedBase}/v1/realtime`, {
     method: "POST",
     body: offer.sdp ?? undefined,
     headers: {

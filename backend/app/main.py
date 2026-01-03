@@ -58,7 +58,6 @@ async def auth_session(request: Request) -> JSONResponse:
         "user": serialize_user(session.user),
         "google": serialize_google(session),
         "prompt": {"id": config.realtime_prompt_id()},
-        "realtime": {"model": config.realtime_model(), "voice": config.realtime_voice()},
     }
     return respond(payload, 200, session_id if needs_cookie else None, needs_cookie)
 
@@ -101,8 +100,6 @@ async def create_realtime_session(request: Request) -> JSONResponse:
 
     api_base = config.realtime_api_base().rstrip("/")
     payload = {
-        "model": config.realtime_model(),
-        "voice": config.realtime_voice(),
         "modalities": ["text", "audio"],
         "prompt": {"id": prompt_id},
         "input_audio_transcription": {"model": "whisper-1"},
@@ -151,8 +148,6 @@ async def create_realtime_session(request: Request) -> JSONResponse:
             "client_secret": client_secret,
             "expires_after": expires_after,
             "url": ws_url,
-            "model": config.realtime_model(),
-            "voice": config.realtime_voice(),
             "prompt_id": prompt_id,
         },
         200,

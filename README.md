@@ -22,8 +22,6 @@ What happens:
 
 - `OPENAI_API_KEY`
 - `VITE_REALTIME_PROMPT_ID` (or `REALTIME_PROMPT_ID`)
-- (optional) `REALTIME_MODEL` or `VITE_REALTIME_MODEL` (defaults to `gpt-4o-realtime-preview-2025-06-03`)
-- (optional) `REALTIME_VOICE` or `VITE_REALTIME_VOICE` (defaults to `alloy`)
 - (optional) `REALTIME_API_BASE` or `VITE_REALTIME_API_BASE` (defaults to `https://api.openai.com`)
 - (optional) `VITE_API_URL` (override the dev proxy target for `/api`)
 - (optional) `APP_TIMEZONE` to control task/event parsing (defaults to UTC)
