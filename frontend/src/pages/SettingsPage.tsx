@@ -106,26 +106,6 @@ export function SettingsPage({ session, refreshSession }: Props) {
             <LoginForm onLogin={handleLogin} />
           )}
         </InfoCard>
-        <InfoCard title="Realtime prompt + model">
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            <dt className="text-slate-500">Prompt ID</dt>
-            <dd className="font-semibold text-slate-900 truncate">
-              {session.prompt?.id || "Not configured"}
-            </dd>
-            <dt className="text-slate-500">Model</dt>
-            <dd className="font-semibold text-slate-900">
-              {session.realtime?.model || "gpt-4o-realtime-preview-2025-06-03"}
-            </dd>
-            <dt className="text-slate-500">Voice</dt>
-            <dd className="font-semibold text-slate-900">
-              {session.realtime?.voice || "alloy"}
-            </dd>
-            <dt className="text-slate-500">Tools</dt>
-            <dd className="text-slate-800">
-              Calendar + tasks via Google with alias protection
-            </dd>
-          </dl>
-        </InfoCard>
       </div>
 
       <InfoCard

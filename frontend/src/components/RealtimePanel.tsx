@@ -515,66 +515,99 @@ export function RealtimePanel({ className, promptId }: Props) {
 
   return (
     <div className={`w-full flex flex-col gap-4 px-4 py-6 ${className ?? ""}`}>
-      <div className="flex flex-col gap-2 rounded-xl bg-white p-4 shadow-sm border border-slate-200">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="space-y-1">
-            <p className="text-xs uppercase font-semibold text-slate-500">
-              Realtime voice assistant
-            </p>
-            <p className="text-lg font-semibold text-slate-900">
-              Status: {headerStatus}
-            </p>
-            <p className="text-sm text-slate-600">
-              Prompt ID:{" "}
-              <span className="font-mono text-slate-800">
-                {resolvedPromptId || "Not configured"}
+      <div className="flex max-lg:flex-col gap-4">
+        <div className="flex flex-col gap-2 rounded-xl bg-white p-4 shadow-sm border border-slate-200">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-1">
+              <p className="text-xs uppercase font-semibold text-slate-500">
+                Realtime voice assistant
+              </p>
+              <p className="text-lg font-semibold text-slate-900">
+                Status: {headerStatus}
+              </p>
+              <p className="text-sm text-slate-600">
+                Prompt ID:{" "}
+                <span className="font-mono text-slate-800 truncate max-w-[200px] inline-block align-bottom">
+                  {resolvedPromptId || "Not configured"}
+                </span>
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={
+                  connectionState === CONNECTION_STATES.DISCONNECTED
+                    ? handleConnect
+                    : handleDisconnect
+                }
+                className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${
+                  connectionState === CONNECTION_STATES.DISCONNECTED
+                    ? "bg-emerald-600 hover:bg-emerald-500"
+                    : "bg-slate-600 hover:bg-slate-500"
+                }`}
+              >
+                {connectionState === CONNECTION_STATES.DISCONNECTED
+                  ? "Connect"
+                  : "Disconnect"}
+              </button>
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={isPushToTalk}
+                  onChange={() => setIsPushToTalk((prev) => !prev)}
+                />
+                Push-to-talk
+              </label>
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                  isOutputAudioBufferActive
+                    ? "bg-emerald-100 text-emerald-800"
+                    : "bg-slate-100 text-slate-700"
+                }`}
+              >
+                {isOutputAudioBufferActive ? "Assistant speaking" : "Idle"}
               </span>
-            </p>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={
-                connectionState === CONNECTION_STATES.DISCONNECTED
-                  ? handleConnect
-                  : handleDisconnect
-              }
-              className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${
-                connectionState === CONNECTION_STATES.DISCONNECTED
-                  ? "bg-emerald-600 hover:bg-emerald-500"
-                  : "bg-slate-600 hover:bg-slate-500"
-              }`}
-            >
-              {connectionState === CONNECTION_STATES.DISCONNECTED
-                ? "Connect"
-                : "Disconnect"}
-            </button>
-            <label className="flex items-center gap-2 text-sm text-slate-700">
-              <input
-                type="checkbox"
-                checked={isPushToTalk}
-                onChange={() => setIsPushToTalk((prev) => !prev)}
-              />
-              Push-to-talk
-            </label>
+          {connectionError ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              {connectionError}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-slate-800">Connection</p>
             <span
               className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                isOutputAudioBufferActive
+                connectionState === CONNECTION_STATES.CONNECTED
                   ? "bg-emerald-100 text-emerald-800"
-                  : "bg-slate-100 text-slate-700"
+                  : connectionState === CONNECTION_STATES.CONNECTING
+                  ? "bg-amber-100 text-amber-800"
+                  : "bg-slate-100 text-slate-600"
               }`}
             >
-              {isOutputAudioBufferActive ? "Assistant speaking" : "Idle"}
+              {headerStatus}
             </span>
           </div>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm text-slate-700">
+            <dt>Prompt</dt>
+            <dd className="font-mono text-[13px] text-slate-900 truncate">
+              {resolvedPromptId || "None"}
+            </dd>
+            <dt>API base</dt>
+            <dd className="text-slate-900">
+              {sessionDetails?.apiBase || deriveApiBase(undefined)}
+            </dd>
+            <dt>Audio mode</dt>
+            <dd className="text-slate-900">
+              {isPushToTalk ? "Push-to-talk" : "Voice activity"}
+            </dd>
+          </dl>
         </div>
-        {connectionError ? (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            {connectionError}
-          </div>
-        ) : null}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4 h-full min-h-[420px]">
+      <div className="grid grid-cols-1 gap-4 h-full min-h-[420px]">
         <div className="flex flex-col rounded-xl bg-white shadow-sm border border-slate-200 overflow-hidden min-h-[360px]">
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
             <div className="text-sm font-semibold text-slate-800">
@@ -656,56 +689,6 @@ export function RealtimePanel({ className, promptId }: Props) {
               Send
             </button>
           </form>
-        </div>
-
-        <div className="flex flex-col gap-3">
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-slate-800">Connection</p>
-              <span
-                className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                  connectionState === CONNECTION_STATES.CONNECTED
-                    ? "bg-emerald-100 text-emerald-800"
-                    : connectionState === CONNECTION_STATES.CONNECTING
-                    ? "bg-amber-100 text-amber-800"
-                    : "bg-slate-100 text-slate-600"
-                }`}
-              >
-                {headerStatus}
-              </span>
-            </div>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm text-slate-700">
-              <dt>Prompt</dt>
-              <dd className="font-mono text-[13px] text-slate-900 truncate">
-                {resolvedPromptId || "None"}
-              </dd>
-              <dt>API base</dt>
-              <dd className="text-slate-900">
-                {sessionDetails?.apiBase || deriveApiBase(undefined)}
-              </dd>
-              <dt>Audio mode</dt>
-              <dd className="text-slate-900">
-                {isPushToTalk ? "Push-to-talk" : "Voice activity"}
-              </dd>
-            </dl>
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-2 text-sm text-slate-700">
-            <p className="text-sm font-semibold text-slate-800">Tips</p>
-            <ul className="list-disc pl-4 space-y-1">
-              <li>
-                Hold the mic button in push-to-talk mode to stream audio into
-                the same session as text.
-              </li>
-              <li>
-                Tool calls are executed server-side with Google alias
-                protections; outputs stream back to the model.
-              </li>
-              <li>
-                Keep the prompt ID updated to control behavior without hardcoded
-                instructions.
-              </li>
-            </ul>
-          </div>
         </div>
       </div>
     </div>
