@@ -1,5 +1,7 @@
 import type { GoogleStatus, PromptInfo, UserProfile } from "./lib/api";
 
+export type ConnectionState = "disconnected" | "connecting" | "connected";
+
 export type SessionState = {
   loading: boolean;
   error?: string | null;

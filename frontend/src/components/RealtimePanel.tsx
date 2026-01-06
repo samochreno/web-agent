@@ -1,8 +1,9 @@
 import type React from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createRealtimeConnection } from "../lib/realtimeConnection";
 import { createRealtimeSession } from "../lib/api";
 import { realtimeTools } from "../lib/realtimeTools";
+import type { ConnectionState } from "../types";
 
 const DEFAULT_API_BASE =
   (import.meta.env.VITE_REALTIME_API_BASE as string | undefined) ||
@@ -14,9 +15,6 @@ const CONNECTION_STATES = {
   CONNECTED: "connected",
 } as const;
 
-type ConnectionState =
-  (typeof CONNECTION_STATES)[keyof typeof CONNECTION_STATES];
-
 type MessageRole = "user" | "assistant" | "tool";
 
 type ConversationMessage = {
@@ -24,11 +22,18 @@ type ConversationMessage = {
   role: MessageRole;
   text: string;
   status: "in_progress" | "done";
+  toolResult?: unknown;
 };
 
 type Props = {
   className?: string;
   promptId?: string;
+  onConnectionStateChange?: (state: ConnectionState) => void;
+  onOutputAudioBufferActiveChange?: (active: boolean) => void;
+  onConnectionHandlersReady?: (handlers: {
+    connect: () => void;
+    disconnect: () => void;
+  }) => void;
 };
 
 type ServerEvent = {
@@ -75,25 +80,51 @@ function deriveApiBase(urlFromSession?: string | null): string {
   }
 }
 
-export function RealtimePanel({ className, promptId }: Props) {
+export function RealtimePanel({
+  className,
+  promptId,
+  onConnectionStateChange,
+  onOutputAudioBufferActiveChange,
+  onConnectionHandlersReady,
+}: Props) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
   const cleanupRef = useRef<() => void>(() => {});
   const hasAutoConnectedRef = useRef(false);
 
-  const [connectionState, setConnectionState] = useState<ConnectionState>(
-    CONNECTION_STATES.DISCONNECTED
-  );
+  const [connectionState, setConnectionStateInternal] =
+    useState<ConnectionState>(CONNECTION_STATES.DISCONNECTED);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
-  const [isOutputAudioBufferActive, setIsOutputAudioBufferActive] =
-    useState(false);
-  const [isPushToTalk, setIsPushToTalk] = useState(false);
-  const [isTalking, setIsTalking] = useState(false);
+  const [
+    isOutputAudioBufferActiveInternal,
+    setIsOutputAudioBufferActiveInternal,
+  ] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
   const [inputText, setInputText] = useState("");
 
+  // Wrapper to sync state with parent
+  const setConnectionState = useCallback(
+    (state: ConnectionState) => {
+      setConnectionStateInternal(state);
+      onConnectionStateChange?.(state);
+    },
+    [onConnectionStateChange]
+  );
+
+  const setIsOutputAudioBufferActive = useCallback(
+    (active: boolean) => {
+      setIsOutputAudioBufferActiveInternal(active);
+      onOutputAudioBufferActiveChange?.(active);
+    },
+    [onOutputAudioBufferActiveChange]
+  );
+
   const resolvedPromptId = promptId;
+
+  const shouldAutoConnect =
+    import.meta.env.VITE_ENABLE_AUTOCONNECT !== "false" && !import.meta.env.DEV;
 
   const addOrUpdateMessage = useCallback(
     (
@@ -116,16 +147,29 @@ export function RealtimePanel({ className, promptId }: Props) {
   );
 
   const appendAssistantText = useCallback((id: string, delta: string) => {
-    setMessages((prev) =>
-      prev.map((message) => {
-        if (message.id !== id) return message;
-        return {
-          ...message,
-          text: `${message.text}${delta}`,
-          status: "in_progress",
-        };
-      })
-    );
+    setMessages((prev) => {
+      const existing = prev.find((m) => m.id === id);
+      if (existing) {
+        return prev.map((message) => {
+          if (message.id !== id) return message;
+          return {
+            ...message,
+            text: `${message.text}${delta}`,
+            status: "in_progress",
+          };
+        });
+      }
+      // Create a new assistant message if it doesn't exist
+      return [
+        ...prev,
+        {
+          id,
+          role: "assistant" as MessageRole,
+          text: delta,
+          status: "in_progress" as const,
+        },
+      ];
+    });
   }, []);
 
   const markMessageDone = useCallback((id: string) => {
@@ -140,7 +184,7 @@ export function RealtimePanel({ className, promptId }: Props) {
     dcRef.current = null;
     pcRef.current = null;
     setMessages([]);
-    setIsTalking(false);
+    setIsMuted(false);
     setIsOutputAudioBufferActive(false);
     setConnectionState(CONNECTION_STATES.DISCONNECTED);
   }, []);
@@ -196,12 +240,32 @@ export function RealtimePanel({ className, promptId }: Props) {
         ...call,
         arguments: safeJsonParse(parsedArgs),
       });
-      addOrUpdateMessage(
-        call.call_id || call.name || crypto.randomUUID(),
-        "tool",
-        `${call.name} completed`,
-        "done"
-      );
+      const messageId = call.call_id || call.name || crypto.randomUUID();
+      setMessages((prev) => {
+        const existing = prev.find((m) => m.id === messageId);
+        if (existing) {
+          return prev.map((m) =>
+            m.id === messageId
+              ? {
+                  ...m,
+                  text: `${call.name} completed`,
+                  status: "done" as const,
+                  toolResult: result,
+                }
+              : m
+          );
+        }
+        return [
+          ...prev,
+          {
+            id: messageId,
+            role: "tool" as MessageRole,
+            text: `${call.name} completed`,
+            status: "done" as const,
+            toolResult: result,
+          },
+        ];
+      });
 
       try {
         sendClientEvent({
@@ -341,20 +405,9 @@ export function RealtimePanel({ className, promptId }: Props) {
   const sendSessionUpdate = useCallback(() => {
     if (!dcRef.current || dcRef.current.readyState !== "open") return;
 
-    const turnDetection = isPushToTalk
-      ? null
-      : {
-          type: "server_vad",
-          threshold: 0.8,
-          prefix_padding_ms: 300,
-          silence_duration_ms: 600,
-          create_response: true,
-        };
-
     const session: Record<string, unknown> = {
       modalities: ["text", "audio"],
-      // input_audio_transcription: { model: "whisper-1" },
-      // turn_detection: turnDetection,
+      input_audio_transcription: { model: "gpt-4o-transcribe", language: "sk" },
       tools: realtimeTools,
     };
 
@@ -369,7 +422,7 @@ export function RealtimePanel({ className, promptId }: Props) {
         err instanceof Error ? err.message : "Unable to update session"
       );
     }
-  }, [isPushToTalk, resolvedPromptId, sendClientEvent]);
+  }, [resolvedPromptId, sendClientEvent]);
 
   const handleConnect = useCallback(async () => {
     if (!resolvedPromptId) {
@@ -459,36 +512,19 @@ export function RealtimePanel({ className, promptId }: Props) {
     resetConnection();
   }, [resetConnection]);
 
-  const handleTalkDown = useCallback(() => {
-    if (connectionState !== CONNECTION_STATES.CONNECTED || !isPushToTalk)
-      return;
-    setIsTalking(true);
-    try {
-      sendClientEvent({ type: "input_audio_buffer.clear" });
-    } catch (err) {
-      setConnectionError(
-        err instanceof Error ? err.message : "Unable to start recording"
-      );
-    }
-  }, [connectionState, isPushToTalk, sendClientEvent]);
+  const handleToggleMute = useCallback(() => {
+    if (connectionState !== CONNECTION_STATES.CONNECTED) return;
+    const pc = pcRef.current;
+    if (!pc) return;
 
-  const handleTalkUp = useCallback(() => {
-    if (
-      connectionState !== CONNECTION_STATES.CONNECTED ||
-      !isPushToTalk ||
-      !isTalking
-    )
-      return;
-    setIsTalking(false);
-    try {
-      sendClientEvent({ type: "input_audio_buffer.commit" });
-      sendClientEvent({ type: "response.create" });
-    } catch (err) {
-      setConnectionError(
-        err instanceof Error ? err.message : "Unable to send audio"
-      );
-    }
-  }, [connectionState, isPushToTalk, isTalking, sendClientEvent]);
+    const newMutedState = !isMuted;
+    pc.getSenders().forEach((sender) => {
+      if (sender.track && sender.track.kind === "audio") {
+        sender.track.enabled = !newMutedState;
+      }
+    });
+    setIsMuted(newMutedState);
+  }, [connectionState, isMuted]);
 
   useEffect(() => {
     return () => {
@@ -500,192 +536,122 @@ export function RealtimePanel({ className, promptId }: Props) {
     if (connectionState === CONNECTION_STATES.CONNECTED) {
       sendSessionUpdate();
     }
-  }, [connectionState, isPushToTalk, resolvedPromptId, sendSessionUpdate]);
+  }, [connectionState, resolvedPromptId, sendSessionUpdate]);
 
   useEffect(() => {
     if (hasAutoConnectedRef.current) return;
     if (connectionState !== CONNECTION_STATES.DISCONNECTED) return;
     if (!resolvedPromptId) return;
+    if (!shouldAutoConnect) return;
 
     hasAutoConnectedRef.current = true;
     void handleConnect();
-  }, [connectionState, handleConnect, resolvedPromptId]);
+  }, [connectionState, handleConnect, resolvedPromptId, shouldAutoConnect]);
 
-  const headerStatus = useMemo(() => {
-    if (connectionState === CONNECTION_STATES.CONNECTED) return "Live";
-    if (connectionState === CONNECTION_STATES.CONNECTING) return "Connecting";
-    return "Disconnected";
-  }, [connectionState]);
+  // Expose connection handlers to parent
+  useEffect(() => {
+    onConnectionHandlersReady?.({
+      connect: handleConnect,
+      disconnect: handleDisconnect,
+    });
+  }, [handleConnect, handleDisconnect, onConnectionHandlersReady]);
 
-  const statusBadgeClass = useMemo(() => {
-    if (connectionState === CONNECTION_STATES.CONNECTED) {
-      return "bg-emerald-100 text-emerald-800";
-    }
-    if (connectionState === CONNECTION_STATES.CONNECTING) {
-      return "bg-amber-100 text-amber-800";
-    }
-    return "bg-slate-100 text-slate-600";
-  }, [connectionState]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   return (
     <div
-      className={`relative h-full w-full overflow-hidden rounded-[28px] border border-slate-200/70 bg-gradient-to-b from-slate-50 via-white to-slate-100 px-5 py-6 shadow-xl ${
+      className={`relative flex h-full w-full flex-col bg-white ${
         className ?? ""
       }`}
     >
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(14,165,233,0.08),transparent_32%),radial-gradient(circle_at_80%_0%,rgba(99,102,241,0.06),transparent_32%),radial-gradient(circle_at_50%_80%,rgba(52,211,153,0.05),transparent_30%)]" />
-
-      <div className="relative flex flex-col gap-4 h-full">
-        <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm backdrop-blur">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="space-y-1">
-              <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-slate-500">
-                Cortana
-              </p>
-              <div className="flex items-center gap-2">
-                <p className="text-xl font-semibold text-slate-900">Status</p>
-                <span
-                  className={`rounded-full px-3 py-1 text-xs font-semibold shadow-sm ${statusBadgeClass}`}
-                >
-                  {headerStatus}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex w-full flex-wrap items-center justify-end gap-3 max-md:justify-start">
-              <span
-                className={`flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[12px] font-semibold text-slate-700 shadow-sm ${
-                  isOutputAudioBufferActive
-                    ? "border-emerald-200 text-emerald-700"
-                    : ""
-                }`}
-              >
-                <span
-                  className={`h-2 w-2 rounded-full ${
-                    isOutputAudioBufferActive
-                      ? "bg-emerald-500 shadow-[0_0_0_6px_rgba(16,185,129,0.2)]"
-                      : "bg-slate-400"
-                  }`}
-                />
-                {isOutputAudioBufferActive ? "Assistant speaking" : "Idle"}
-              </span>
-
-              <label className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[12px] font-semibold text-slate-700 shadow-sm">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 accent-emerald-500"
-                  checked={isPushToTalk}
-                  onChange={() => setIsPushToTalk((prev) => !prev)}
-                />
-                Push-to-talk
-              </label>
-
-              <button
-                onClick={
-                  connectionState === CONNECTION_STATES.DISCONNECTED
-                    ? handleConnect
-                    : handleDisconnect
-                }
-                className={`rounded-full px-4 py-2 text-sm font-semibold shadow-sm transition ${
-                  connectionState === CONNECTION_STATES.DISCONNECTED
-                    ? "bg-emerald-500 text-white hover:bg-emerald-400"
-                    : "bg-slate-900 text-white hover:bg-slate-800"
-                }`}
-              >
-                {connectionState === CONNECTION_STATES.DISCONNECTED
-                  ? "Connect"
-                  : "Disconnect"}
-              </button>
-            </div>
-          </div>
-
-          {connectionError ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 shadow-inner">
-              {connectionError}
-            </div>
-          ) : null}
+      {/* Connection error banner */}
+      {connectionError && (
+        <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+          {connectionError}
         </div>
+      )}
 
-        <div className="flex min-h-[420px] flex-col gap-3 rounded-2xl border border-slate-200 bg-white/90 shadow-sm backdrop-blur h-full">
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              Transcript
-            </div>
-            {isPushToTalk && connectionState === CONNECTION_STATES.CONNECTED ? (
-              <button
-                onMouseDown={handleTalkDown}
-                onMouseUp={handleTalkUp}
-                onMouseLeave={handleTalkUp}
-                onTouchStart={handleTalkDown}
-                onTouchEnd={handleTalkUp}
-                className={`rounded-full px-4 py-2 text-sm font-semibold shadow-sm transition ${
-                  isTalking
-                    ? "bg-rose-500 text-white hover:bg-rose-400"
-                    : "bg-emerald-500 text-white hover:bg-emerald-400"
-                }`}
-              >
-                {isTalking ? "Release to send" : "Hold to talk"}
-              </button>
-            ) : null}
-          </div>
-
-          <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
-            {messages.length === 0 ? (
-              <p className="text-sm text-slate-500">
+      {/* Scrollable messages area */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-3xl px-4 py-6">
+          {messages.length === 0 ? (
+            <div className="flex h-full items-center justify-center py-20">
+              <p className="text-sm text-slate-400">
                 Start speaking or type a message to begin.
               </p>
-            ) : (
-              messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex flex-col gap-1 max-w-3xl rounded-2xl border px-4 py-3 shadow-sm transition ${
-                    message.role === "user"
-                      ? "self-end border-sky-200 bg-sky-50 text-sky-900"
-                      : message.role === "tool"
-                      ? "self-start border-amber-200 bg-amber-50 text-amber-900"
-                      : "self-start border-slate-200 bg-slate-50 text-slate-900"
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-slate-500">
-                    <span>
-                      {message.role === "assistant"
-                        ? "Assistant"
-                        : message.role === "user"
-                        ? "You"
-                        : "Tool"}
-                    </span>
-                    <span className="text-[11px] font-semibold text-slate-400">
-                      {message.status === "done" ? "Done" : "Live"}
-                    </span>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {messages
+                .filter(
+                  (message) => message.role !== "assistant" || message.text
+                )
+                .map((message) => (
+                  <div
+                    key={message.id}
+                    className={`flex ${
+                      message.role === "user" ? "justify-end" : "justify-start"
+                    }`}
+                  >
+                    <div
+                      className={`max-w-[85%] rounded-2xl px-4 py-3 ${
+                        message.role === "user"
+                          ? "bg-rose-100 text-slate-900"
+                          : message.role === "tool"
+                          ? "bg-amber-50 border border-amber-200 text-amber-900"
+                          : "bg-transparent text-slate-900"
+                      }`}
+                    >
+                      {message.role !== "user" && (
+                        <div className="mb-1 flex items-center gap-2">
+                          <span className="text-xs font-medium text-slate-500">
+                            {message.role === "assistant" ? "Cortana" : "Tool"}
+                          </span>
+                          {message.status === "in_progress" && (
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          )}
+                        </div>
+                      )}
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                        {message.text || "…"}
+                      </p>
+                      {message.role === "tool" &&
+                        message.toolResult !== undefined && (
+                          <details className="mt-2">
+                            <summary className="cursor-pointer text-xs text-amber-700 hover:text-amber-900">
+                              Response
+                            </summary>
+                            <pre className="mt-1 max-h-48 overflow-auto rounded bg-amber-100/50 p-2 text-xs text-amber-800">
+                              {JSON.stringify(message.toolResult, null, 2)}
+                            </pre>
+                          </details>
+                        )}
+                    </div>
                   </div>
-                  <p className="text-sm leading-6 text-slate-900 whitespace-pre-line">
-                    {message.text || "…"}
-                  </p>
-                </div>
-              ))
-            )}
-          </div>
+                ))}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
+        </div>
+      </div>
 
+      {/* Bottom input area - sticky footer */}
+      <div className="sticky bottom-0 border-t border-slate-200 bg-white px-4 py-4">
+        <div className="mx-auto max-w-3xl">
           <form
-            className="flex items-center gap-3 border-t border-slate-100 bg-slate-50/80 px-5 py-4"
+            className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-2 py-2"
             onSubmit={handleTextSubmit}
           >
-            <input
-              type="text"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              placeholder="Ask anything"
-              className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-inner outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/30 disabled:opacity-60"
-              disabled={connectionState !== CONNECTION_STATES.CONNECTED}
-            />
+            {/* Plus button placeholder */}
             <button
-              type="submit"
-              disabled={
-                connectionState !== CONNECTION_STATES.CONNECTED ||
-                !inputText.trim()
-              }
-              className="rounded-xl bg-emerald-500 p-3 text-white shadow-md transition hover:bg-emerald-400 disabled:opacity-60"
+              type="button"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition"
+              disabled
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -693,10 +659,73 @@ export function RealtimePanel({ className, promptId }: Props) {
                 fill="currentColor"
                 className="h-5 w-5"
               >
+                <path
+                  fillRule="evenodd"
+                  d="M12 3.75a.75.75 0 0 1 .75.75v6.75h6.75a.75.75 0 0 1 0 1.5h-6.75v6.75a.75.75 0 0 1-1.5 0v-6.75H4.5a.75.75 0 0 1 0-1.5h6.75V4.5a.75.75 0 0 1 .75-.75Z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </button>
+
+            <input
+              type="text"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              placeholder="Ask anything"
+              className="flex-1 bg-transparent py-2 text-sm text-slate-900 placeholder-slate-400 outline-none disabled:opacity-60"
+              disabled={connectionState !== CONNECTION_STATES.CONNECTED}
+            />
+
+            {/* Mute button */}
+            <button
+              type="button"
+              onClick={handleToggleMute}
+              disabled={connectionState !== CONNECTION_STATES.CONNECTED}
+              className={`flex h-8 w-8 items-center justify-center rounded-full transition ${
+                isMuted
+                  ? "bg-red-500 text-white"
+                  : "text-slate-400 hover:bg-slate-200 hover:text-slate-600 disabled:opacity-50"
+              }`}
+              title={isMuted ? "Unmute microphone" : "Mute microphone"}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                className="h-5 w-5"
+              >
+                <path d="M8.25 4.5a3.75 3.75 0 1 1 7.5 0v8.25a3.75 3.75 0 1 1-7.5 0V4.5Z" />
+                <path d="M6 10.5a.75.75 0 0 1 .75.75v1.5a5.25 5.25 0 1 0 10.5 0v-1.5a.75.75 0 0 1 1.5 0v1.5a6.751 6.751 0 0 1-6 6.709v2.291h3a.75.75 0 0 1 0 1.5h-7.5a.75.75 0 0 1 0-1.5h3v-2.291a6.751 6.751 0 0 1-6-6.709v-1.5A.75.75 0 0 1 6 10.5Z" />
+              </svg>
+            </button>
+
+            {/* Send / Stop button */}
+            <button
+              type="submit"
+              disabled={
+                connectionState !== CONNECTION_STATES.CONNECTED ||
+                !inputText.trim()
+              }
+              className={`flex h-8 w-8 items-center justify-center rounded-full transition ${
+                connectionState === CONNECTION_STATES.CONNECTED &&
+                inputText.trim()
+                  ? "bg-slate-900 text-white hover:bg-slate-700"
+                  : "bg-slate-200 text-slate-400"
+              }`}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                className="h-4 w-4"
+              >
                 <path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
               </svg>
             </button>
           </form>
+          <p className="mt-2 text-center text-xs text-slate-400">
+            Cortana can make mistakes. Check important info.
+          </p>
         </div>
       </div>
     </div>

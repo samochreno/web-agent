@@ -1,6 +1,6 @@
 {
-  "name": "Realtime Voice Assistant",
-  "short_name": "Voice AI",
+  "name": "Cortana Assistant",
+  "short_name": "Cortana",
   "description": "Realtime GPT assistant with voice + text streaming and Google productivity tools.",
   "start_url": "/",
   "scope": "/",
