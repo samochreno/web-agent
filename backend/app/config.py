@@ -114,6 +114,14 @@ def frontend_url(fallback: str | None = None) -> str:
     return "http://127.0.0.1:3000"
 
 
+def frontend_settings_path() -> str:
+    """Path or hash fragment to the settings screen. Defaults to hash router '/#/settings'."""
+    raw = os.getenv("FRONTEND_SETTINGS_PATH")
+    if raw and raw.strip():
+        return raw.strip()
+    return "#/settings"
+
+
 def is_prod() -> bool:
     env = (os.getenv("ENVIRONMENT") or os.getenv("NODE_ENV") or "").lower()
     return env == "production"

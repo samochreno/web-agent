@@ -324,9 +324,7 @@ async def google_callback(request: Request, code: str | None = None, state: str 
 
     SESSION_STORE.reset_aliases(session_id)
     fallback_base = _determine_frontend_url(request)
-    response = RedirectResponse(
-        url=f"{config.frontend_url(fallback_base)}/settings?google=connected"
-    )
+    response = RedirectResponse(url=_settings_redirect_url(fallback_base))
     if needs_cookie:
         apply_cookie(response, session_id)
     return response
@@ -482,6 +480,20 @@ def _determine_frontend_url(request: Request) -> str:
 def _runtime_google_redirect_uri(request: Request) -> str:
     base = str(request.base_url).rstrip("/")
     return f"{base}/api/google/callback"
+
+
+def _settings_redirect_url(fallback_base: str) -> str:
+    base = config.frontend_url(fallback_base).rstrip("/")
+    settings_path = config.frontend_settings_path()
+
+    # Preserve hash fragments; avoid stripping leading '#'
+    if settings_path.startswith("#"):
+        redirect = f"{base}/{settings_path}"
+    else:
+        redirect = f"{base}/{settings_path.lstrip('/')}"
+
+    connector = "&" if "?" in redirect else "?"
+    return f"{redirect}{connector}google=connected"
 
 
 _repo_root = Path(__file__).resolve().parents[2]
