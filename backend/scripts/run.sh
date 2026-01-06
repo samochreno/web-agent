@@ -40,7 +40,7 @@ if [ -z "${OPENAI_API_KEY:-}" ]; then
   exit 1
 fi
 
-FRONTEND_TARBALL="$PROJECT_ROOT/backend/frontend_dist.tar.gz"
+FRONTEND_TARBALL="$PROJECT_ROOT/frontend_dist.tar.gz"
 if [ -f "$FRONTEND_TARBALL" ]; then
   FRONTEND_DIR="$PROJECT_ROOT/frontend/dist"
   echo "Extracting frontend build from $FRONTEND_TARBALL ..."
