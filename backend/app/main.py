@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
+from urllib.parse import urlparse
 
 from . import config
 from .alias import AliasService
@@ -283,8 +284,9 @@ async def google_auth(request: Request) -> JSONResponse:
     if not session.user:
         return respond({"error": "Login required."}, 401, session_id if needs_cookie else None, needs_cookie)
 
+    redirect_uri = _runtime_google_redirect_uri(request)
     try:
-        url = build_google_auth_url(session)
+        url = build_google_auth_url(session, redirect_uri)
     except GoogleNotConfigured:
         return respond(
             {"error": "Google OAuth is not configured."},
@@ -302,17 +304,18 @@ async def google_callback(request: Request, code: str | None = None, state: str 
     if not code or not state:
         raise HTTPException(status_code=400, detail="Missing OAuth parameters.")
 
+    redirect_uri = _runtime_google_redirect_uri(request)
     try:
-        await run_in_threadpool(handle_oauth_callback, session, code, state)
+        await run_in_threadpool(handle_oauth_callback, session, code, state, redirect_uri)
     except GoogleNotConfigured as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     SESSION_STORE.reset_aliases(session_id)
-    fallback_base = str(request.base_url).rstrip("/")
+    fallback_base = _determine_frontend_url(request)
     response = RedirectResponse(
-        url=f"{config.frontend_base_url(fallback_base)}/settings?google=connected"
+        url=f"{config.frontend_url(fallback_base)}/settings?google=connected"
     )
     if needs_cookie:
         apply_cookie(response, session_id)
@@ -455,6 +458,20 @@ def serialize_google(session: SessionData) -> Mapping[str, Any]:
         "email": connection.email if connection else None,
         "expires_at": connection.expires_at.isoformat() if connection and connection.expires_at else None,
     }
+
+
+def _determine_frontend_url(request: Request) -> str:
+    base = str(request.base_url).rstrip("/")
+    override_hosts = {"localhost", "127.0.0.1", "0.0.0.0"}
+    parsed = urlparse(base)
+    if parsed.hostname in override_hosts:
+        return "http://localhost:3000"
+    return base
+
+
+def _runtime_google_redirect_uri(request: Request) -> str:
+    base = str(request.base_url).rstrip("/")
+    return f"{base}/api/google/callback"
 
 
 _repo_root = Path(__file__).resolve().parents[2]

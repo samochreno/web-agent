@@ -71,8 +71,13 @@ def google_client_secret() -> str | None:
     return raw.strip() if raw and raw.strip() else None
 
 
-def google_redirect_uri() -> str:
-    return os.getenv("GOOGLE_REDIRECT_URI", "http://127.0.0.1:8000/api/google/callback")
+def google_redirect_uri(fallback: str | None = None) -> str:
+    env_value = os.getenv("GOOGLE_REDIRECT_URI")
+    if env_value and env_value.strip():
+        return env_value.rstrip("/")
+    if fallback and fallback.strip():
+        return fallback.rstrip("/")
+    return "http://127.0.0.1:8000/api/google/callback"
 
 
 def google_scopes() -> List[str]:
@@ -99,9 +104,9 @@ def google_default_duration_minutes() -> int:
         return 60
 
 
-def frontend_base_url(fallback: str | None = None) -> str:
+def frontend_url(fallback: str | None = None) -> str:
     """Resolve the frontend base URL (allows overriding via env var or request info)."""
-    env_value = os.getenv("FRONTEND_BASE_URL")
+    env_value = os.getenv("FRONTEND_URL")
     if env_value and env_value.strip():
         return env_value.rstrip("/")
     if fallback and fallback.strip():
