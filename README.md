@@ -49,7 +49,7 @@ project and organization.
 
 ## CI automation
 
-- `frontend` builds now run inside `.github/workflows/build-assets.yml`: the action installs Node, builds the SPA, packages `frontend/dist` into `backend/frontend_dist.tar.gz`, and writes `backend/requirements.txt` from `backend/pyproject.toml`. If either artifact changes, the job commits/pushes the updates with `[skip ci]` so your `main` branch always contains the latest Python manifest and frontend bundle.
+- `frontend` builds now run inside `.github/workflows/build-assets.yml`: the action installs Node, builds the SPA, packages `frontend/dist` into `backend/frontend_dist.tar.gz`, and writes `backend/requirements.txt` from `backend/pyproject.toml`. If either artifact changes, the job now fails and prints `git status` so you can commit the updated files locally before pushing; this keeps `main` containing the latest Python manifest and frontend bundle.
 - `backend/scripts/run.sh` extracts that tarball into `frontend/dist` before starting `uvicorn app.main:app`, so the deployment only needs to install the Python dependencies (`pip install -r requirements.txt`) and can serve the static UI without running Node on the platform.
 - For local testing, rebuild the frontend (`npm --prefix frontend run build`) and regenerate the requirements file (`python backend/scripts/generate_requirements.py`) before starting the backend.
 

@@ -37,14 +37,12 @@ jobs:
       - name: Package frontend dist
         run: python backend/scripts/create_frontend_tarball.py
 
-      - name: Commit generated assets
+      - name: Check generated assets
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
           if git diff --quiet backend/requirements.txt backend/frontend_dist.tar.gz; then
             echo "requirements and frontend bundle already up to date"
           else
-            git add backend/requirements.txt backend/frontend_dist.tar.gz
-            git commit -m "chore: sync generated assets [skip ci]"
-            git push
+            echo "Generated assets differ; commit them locally before pushing."
+            git status --short backend/requirements.txt backend/frontend_dist.tar.gz
+            exit 1
           fi

@@ -49,6 +49,11 @@ TOOL_EXECUTOR = ToolExecutor(TASKS_SERVICE, CALENDAR_SERVICE, VISIBILITY_SERVICE
 NON_GOOGLE_TOOLS = {"get_current_datetime", "web_search"}
 
 
+@app.get("/")
+async def root() -> Mapping[str, str]:
+    return {"message": "Realtime Assistant API", "docs": "/docs"}
+
+
 @app.get("/health")
 async def health() -> Mapping[str, str]:
     return {"status": "ok"}
