@@ -46,3 +46,15 @@ project and organization.
 - Settings + calendar visibility: `frontend/src/pages/SettingsPage.tsx`
 - Session + tool server logic: `backend/app/main.py`, `backend/app/tools.py`
 - Google + calendar safety: `backend/app/google.py`, `backend/app/calendar_visibility.py`, `backend/app/alias.py`
+
+## CI automation
+
+- `frontend` builds now run inside `.github/workflows/build-assets.yml`: the action installs Node, builds the SPA, packages `frontend/dist` into `backend/frontend_dist.tar.gz`, and writes `backend/requirements.txt` from `backend/pyproject.toml`. If either artifact changes, the job commits/pushes the updates with `[skip ci]` so your `main` branch always contains the latest Python manifest and frontend bundle.
+- `backend/scripts/run.sh` extracts that tarball into `frontend/dist` before starting `uvicorn app.main:app`, so the deployment only needs to install the Python dependencies (`pip install -r requirements.txt`) and can serve the static UI without running Node on the platform.
+- For local testing, rebuild the frontend (`npm --prefix frontend run build`) and regenerate the requirements file (`python backend/scripts/generate_requirements.py`) before starting the backend.
+
+### Future deploy steps
+
+1. Push changes to `main`; the workflow rebuilds the frontend, updates `backend/frontend_dist.tar.gz`, and keeps `backend/requirements.txt` in sync.
+2. Let App Platform install `requirements.txt` and run `./backend/scripts/run.sh` (it already pulls the latest tarball and extracts it).
+3. Ensure required env vars (`OPENAI_API_KEY`, `VITE_REALTIME_PROMPT_ID`, Google credentials, etc.) remain defined for the backend service.

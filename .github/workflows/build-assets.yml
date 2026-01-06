@@ -1,0 +1,58 @@
+name: Build frontend & backend assets
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  sync-assets:
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+
+      - name: Install frontend deps
+        run: npm --prefix frontend install
+
+      - name: Build frontend
+        run: npm --prefix frontend run build
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Regenerate requirements
+        run: python backend/scripts/generate_requirements.py
+
+      - name: Package frontend dist
+        run: |
+          FRONTEND_DIST=frontend/dist
+          TARBALL=backend/frontend_dist.tar.gz
+          if [ ! -d "$FRONTEND_DIST" ]; then
+            echo "Frontend dist not found at $FRONTEND_DIST"
+            exit 1
+          fi
+          rm -f "$TARBALL"
+          tar --sort=name --mtime='UTC 2024-01-01' --owner=0 --group=0 --numeric-owner -czf "$TARBALL" -C frontend dist
+
+      - name: Commit generated assets
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet backend/requirements.txt backend/frontend_dist.tar.gz; then
+            echo "requirements and frontend bundle already up to date"
+          else
+            git add backend/requirements.txt backend/frontend_dist.tar.gz
+            git commit -m "chore: sync generated assets [skip ci]"
+            git push
+          fi

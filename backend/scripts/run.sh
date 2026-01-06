@@ -40,6 +40,15 @@ if [ -z "${OPENAI_API_KEY:-}" ]; then
   exit 1
 fi
 
+FRONTEND_TARBALL="$PROJECT_ROOT/backend/frontend_dist.tar.gz"
+if [ -f "$FRONTEND_TARBALL" ]; then
+  FRONTEND_DIR="$PROJECT_ROOT/frontend/dist"
+  echo "Extracting frontend build from $FRONTEND_TARBALL ..."
+  rm -rf "$FRONTEND_DIR"
+  mkdir -p "$FRONTEND_DIR"
+  tar -xzf "$FRONTEND_TARBALL" -C "$PROJECT_ROOT/frontend"
+fi
+
 export PYTHONPATH="$PROJECT_ROOT${PYTHONPATH:+:$PYTHONPATH}"
 
 echo "Starting Realtime assistant backend on http://127.0.0.1:8000 ..."
