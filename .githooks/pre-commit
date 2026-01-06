@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+# Allow skipping asset sync on machines where npm isn't available.
+if [ -n "${SKIP_ASSET_SYNC:-}" ]; then
+  exit 0
+fi
+
+# Build the SPA if npm exists.
+if command -v npm >/dev/null 2>&1; then
+  npm --prefix frontend install
+  npm --prefix frontend run build
+else
+  echo "npm not found; make sure frontend/dist is up to date before committing."
+fi
+
+python backend/scripts/generate_requirements.py
+
+FRONTEND_DIST="frontend/dist"
+TARBALL="backend/frontend_dist.tar.gz"
+if [ ! -d "$FRONTEND_DIST" ]; then
+  echo "Frontend build missing at $FRONTEND_DIST; run the frontend build before committing." >&2
+  exit 1
+fi
+
+rm -f "$TARBALL"
+tar --sort=name --mtime='UTC 2024-01-01' --owner=0 --group=0 --numeric-owner -czf "$TARBALL" -C frontend dist
+
+git add backend/requirements.txt "$TARBALL"

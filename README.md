@@ -53,6 +53,18 @@ project and organization.
 - `backend/scripts/run.sh` extracts that tarball into `frontend/dist` before starting `uvicorn app.main:app`, so the deployment only needs to install the Python dependencies (`pip install -r requirements.txt`) and can serve the static UI without running Node on the platform.
 - For local testing, rebuild the frontend (`npm --prefix frontend run build`) and regenerate the requirements file (`python backend/scripts/generate_requirements.py`) before starting the backend.
 
+### Local hooks
+
+1. Enable the repository hook path once per machine:
+
+   ```bash
+   git config core.hooksPath .githooks
+   chmod +x .githooks/pre-commit
+   ```
+
+2. Every commit then runs `.githooks/pre-commit`, which builds the SPA when `npm` is available, regenerates `backend/requirements.txt`, packages `frontend/dist` into `backend/frontend_dist.tar.gz`, and stages both files so the deploy always sees the latest assets.  
+3. Set `SKIP_ASSET_SYNC=1` in your shell to skip the hook if a machine lacks `npm` or the full toolchain.
+
 ### Future deploy steps
 
 1. Push changes to `main`; the workflow rebuilds the frontend, updates `backend/frontend_dist.tar.gz`, and keeps `backend/requirements.txt` in sync.
