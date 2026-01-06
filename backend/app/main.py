@@ -49,11 +49,6 @@ TOOL_EXECUTOR = ToolExecutor(TASKS_SERVICE, CALENDAR_SERVICE, VISIBILITY_SERVICE
 NON_GOOGLE_TOOLS = {"get_current_datetime", "web_search"}
 
 
-@app.get("/")
-async def root() -> Mapping[str, str]:
-    return {"message": "Realtime Assistant API", "docs": "/docs"}
-
-
 @app.get("/health")
 async def health() -> Mapping[str, str]:
     return {"status": "ok"}
@@ -464,3 +459,7 @@ _default_frontend_dist = _repo_root / "frontend" / "dist"
 _frontend_dist_dir = Path(os.environ.get("FRONTEND_DIST_DIR") or _default_frontend_dist)
 if _frontend_dist_dir.is_dir():
     app.mount("/", StaticFiles(directory=str(_frontend_dist_dir), html=True), name="frontend")
+else:
+    @app.get("/")
+    async def root() -> Mapping[str, str]:
+        return {"message": "Realtime Assistant API", "docs": "/docs"}
