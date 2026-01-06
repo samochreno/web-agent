@@ -51,5 +51,6 @@ fi
 
 export PYTHONPATH="$PROJECT_ROOT${PYTHONPATH:+:$PYTHONPATH}"
 
-echo "Starting Realtime assistant backend on http://127.0.0.1:8000 ..."
-exec uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+APP_PORT="${PORT:-8080}"
+echo "Starting Realtime assistant backend on http://0.0.0.0:${APP_PORT} ..."
+exec uvicorn app.main:app --host 0.0.0.0 --port "${APP_PORT}"
