@@ -1,5 +1,9 @@
 export type UserProfile = { id: string; email: string; name?: string | null };
-export type GoogleStatus = { connected: boolean; email?: string | null; expires_at?: string | null };
+export type GoogleStatus = {
+  connected: boolean;
+  email?: string | null;
+  expires_at?: string | null;
+};
 export type PromptInfo = { id?: string | null };
 
 export type SessionResponse = {
@@ -28,7 +32,9 @@ async function fetchJson<T>(path: string, init: RequestInit = {}): Promise<T> {
     ...init,
   });
 
-  const payload = (await response.json().catch(() => ({}))) as { error?: string };
+  const payload = (await response.json().catch(() => ({}))) as {
+    error?: string;
+  };
   if (!response.ok) {
     throw new Error(payload.error || "Request failed");
   }
@@ -45,10 +51,14 @@ export async function googleAuthUrl(): Promise<{ url: string }> {
 }
 
 export async function disconnectGoogle() {
-  return fetchJson<{ disconnected: boolean }>("/api/google/disconnect", { method: "POST" });
+  return fetchJson<{ disconnected: boolean }>("/api/google/disconnect", {
+    method: "POST",
+  });
 }
 
-export async function loadCalendars(): Promise<{ calendars: CalendarOption[] }> {
+export async function loadCalendars(): Promise<{
+  calendars: CalendarOption[];
+}> {
   return fetchJson<{ calendars: CalendarOption[] }>("/api/calendars");
 }
 
@@ -68,7 +78,9 @@ export type RealtimeSessionConfig = {
   prompt_id?: string;
 };
 
-export async function createRealtimeSession(promptId?: string): Promise<RealtimeSessionConfig> {
+export async function createRealtimeSession(
+  promptId?: string
+): Promise<RealtimeSessionConfig> {
   return fetchJson<RealtimeSessionConfig>("/api/realtime/session", {
     method: "POST",
     body: JSON.stringify(promptId ? { prompt: { id: promptId } } : {}),
