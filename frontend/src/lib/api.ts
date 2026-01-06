@@ -40,17 +40,6 @@ export async function getSession(): Promise<SessionResponse> {
   return fetchJson<SessionResponse>("/api/auth/session");
 }
 
-export async function login(email: string, name?: string) {
-  return fetchJson<{ user: UserProfile }>("/api/auth/login", {
-    method: "POST",
-    body: JSON.stringify({ email, name }),
-  });
-}
-
-export async function logout() {
-  return fetchJson<{ ok: boolean }>("/api/auth/logout", { method: "POST" });
-}
-
 export async function googleAuthUrl(): Promise<{ url: string }> {
   return fetchJson<{ url: string }>("/api/google/auth-url");
 }

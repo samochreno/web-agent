@@ -1,12 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { CalendarSelector } from "../components/CalendarSelector";
-import { LoginForm } from "../components/LoginForm";
 import {
   disconnectGoogle,
   googleAuthUrl,
   loadCalendars,
-  login,
-  logout,
   updateVisibleCalendars,
   type CalendarOption,
 } from "../lib/api";
@@ -50,17 +47,6 @@ export function SettingsPage({ session, refreshSession }: Props) {
     }
   };
 
-  const handleLogin = async (email: string, name?: string) => {
-    await login(email, name);
-    await refreshSession();
-  };
-
-  const handleLogout = async () => {
-    await logout();
-    await refreshSession();
-    setCalendars([]);
-  };
-
   const handleGoogleConnect = async () => {
     const { url } = await googleAuthUrl();
     window.location.href = url;
@@ -82,44 +68,6 @@ export function SettingsPage({ session, refreshSession }: Props) {
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-2xl px-4 py-8 space-y-8">
-          {/* Account Section */}
-          <section>
-            <h2 className="text-sm font-medium text-slate-500 mb-4">Account</h2>
-            {session.user ? (
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-sm font-medium text-white">
-                    {session.user.email.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-slate-900">
-                      {session.user.email}
-                    </p>
-                    {session.user.name && (
-                      <p className="text-sm text-slate-500">
-                        {session.user.name}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <button
-                  onClick={() => void handleLogout()}
-                  className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-200"
-                >
-                  Sign out
-                </button>
-              </div>
-            ) : (
-              <LoginForm onLogin={handleLogin} />
-            )}
-            <p className="mt-4 text-xs text-slate-400">
-              Sessions are stored in a secure cookie. Use a recognizable email
-              so tool calls and state variables stay scoped to you.
-            </p>
-          </section>
-
-          <hr className="border-slate-100" />
-
           {/* Google Connection Section */}
           <section>
             <h2 className="text-sm font-medium text-slate-500 mb-4">
