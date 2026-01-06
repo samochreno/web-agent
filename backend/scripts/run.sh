@@ -40,13 +40,14 @@ if [ -z "${OPENAI_API_KEY:-}" ]; then
   exit 1
 fi
 
+REPO_ROOT="$(cd "$PROJECT_ROOT/.." && pwd)"
 FRONTEND_TARBALL="$PROJECT_ROOT/frontend_dist.tar.gz"
 if [ -f "$FRONTEND_TARBALL" ]; then
-  FRONTEND_DIR="$PROJECT_ROOT/frontend/dist"
+  FRONTEND_DIR="$REPO_ROOT/frontend/dist"
   echo "Extracting frontend build from $FRONTEND_TARBALL ..."
   rm -rf "$FRONTEND_DIR"
   mkdir -p "$FRONTEND_DIR"
-  tar -xzf "$FRONTEND_TARBALL" -C "$PROJECT_ROOT/frontend"
+  tar -xzf "$FRONTEND_TARBALL" -C "$REPO_ROOT/frontend"
 fi
 
 export PYTHONPATH="$PROJECT_ROOT${PYTHONPATH:+:$PYTHONPATH}"
