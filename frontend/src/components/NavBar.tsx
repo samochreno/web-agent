@@ -38,7 +38,7 @@ export function NavBar({
 
   return (
     <header className="w-full border-b border-slate-200 bg-white">
-      <div className="flex items-center justify-between px-4 py-3">
+      <div className="flex items-center justify-between px-4 py-3 h-12">
         <div className="flex items-center gap-3">
           {/* Hamburger menu button */}
           <button
@@ -96,7 +96,7 @@ export function NavBar({
                 connectionState === "disconnected" ? onConnect : onDisconnect
               }
               disabled={!onConnect || !onDisconnect}
-              className={`rounded-full px-4 py-1.5 text-sm font-medium transition disabled:opacity-50 ${
+              className={`rounded-full px-4 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
                 connectionState === "disconnected"
                   ? "bg-emerald-500 text-white hover:bg-emerald-600"
                   : "bg-slate-100 text-slate-700 hover:bg-slate-200"
