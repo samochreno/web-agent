@@ -123,8 +123,7 @@ export function RealtimePanel({
 
   const resolvedPromptId = promptId;
 
-  const shouldAutoConnect =
-    import.meta.env.VITE_ENABLE_AUTOCONNECT !== "false" && !import.meta.env.DEV;
+  const shouldAutoConnect = import.meta.env.PROD;
 
   const addOrUpdateMessage = useCallback(
     (
