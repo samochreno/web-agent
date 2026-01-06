@@ -55,15 +55,16 @@ project and organization.
 
 ### Local hooks
 
-1. Enable the repository hook path once per machine:
+1. Ensure your local Node is >=20.19.0 (or >=22.12.0) so Vite can build; upgrade via your version manager (nvm, asdf, etc.) if necessary.
+2. Enable the repository hook path once per machine:
 
    ```bash
    git config core.hooksPath .githooks
    chmod +x .githooks/pre-commit
    ```
 
-2. Every commit then runs `.githooks/pre-commit`, which builds the SPA when `npm` is available, regenerates `backend/requirements.txt`, packages `frontend/dist` into `backend/frontend_dist.tar.gz`, and stages both files so the deploy always sees the latest assets.  
-3. Set `SKIP_ASSET_SYNC=1` in your shell to skip the hook if a machine lacks `npm` or the full toolchain.
+3. Every commit then runs `.githooks/pre-commit`, which builds the SPA when `npm` is available, regenerates `backend/requirements.txt`, packages `frontend/dist` into `backend/frontend_dist.tar.gz`, and stages both files so the deploy always sees the latest assets.  
+4. Set `SKIP_ASSET_SYNC=1` in your shell to skip the hook if a machine lacks `npm` or the full toolchain.
 
 ### Future deploy steps
 

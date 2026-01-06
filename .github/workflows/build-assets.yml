@@ -35,15 +35,7 @@ jobs:
         run: python backend/scripts/generate_requirements.py
 
       - name: Package frontend dist
-        run: |
-          FRONTEND_DIST=frontend/dist
-          TARBALL=backend/frontend_dist.tar.gz
-          if [ ! -d "$FRONTEND_DIST" ]; then
-            echo "Frontend dist not found at $FRONTEND_DIST"
-            exit 1
-          fi
-          rm -f "$TARBALL"
-          tar --sort=name --mtime='UTC 2024-01-01' --owner=0 --group=0 --numeric-owner -czf "$TARBALL" -C frontend dist
+        run: python backend/scripts/create_frontend_tarball.py
 
       - name: Commit generated assets
         run: |
