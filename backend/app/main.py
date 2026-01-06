@@ -488,8 +488,7 @@ def _settings_redirect_url(fallback_base: str) -> str:
     else:
         redirect = f"{base}/{settings_path.lstrip('/')}"
 
-    connector = "&" if "?" in redirect else "?"
-    return f"{redirect}{connector}google=connected"
+    return redirect
 
 
 _repo_root = Path(__file__).resolve().parents[2]

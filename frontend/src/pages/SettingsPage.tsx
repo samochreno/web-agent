@@ -19,11 +19,6 @@ export function SettingsPage({ session, refreshSession }: Props) {
   const [calendarError, setCalendarError] = useState<string | null>(null);
   const [loadingCalendars, setLoadingCalendars] = useState(false);
 
-  const googleNotice = useMemo(() => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("google") === "connected";
-  }, []);
-
   useEffect(() => {
     if (session.google.connected) {
       void fetchCalendars();
@@ -77,13 +72,6 @@ export function SettingsPage({ session, refreshSession }: Props) {
               Connect Google to unlock the scheduling tools. IDs stay masked
               through aliasing so the model never sees raw Google identifiers.
             </p>
-
-            {googleNotice && (
-              <div className="mb-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                Google connected — you can now choose which calendars are
-                shared.
-              </div>
-            )}
 
             <div className="flex items-center gap-3 mb-4">
               <span

@@ -133,5 +133,6 @@ export default function App() {
 
 function resolveRoute(): string {
   const hash = window.location.hash.slice(1) || "/";
-  return routes.includes(hash) ? hash : "/";
+  const path = hash.split("?")[0] || "/";
+  return routes.includes(path) ? path : "/";
 }
