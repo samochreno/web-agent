@@ -640,7 +640,7 @@ export function RealtimePanel({
       </div>
 
       {/* Bottom input area - sticky footer */}
-      <div className="sticky bottom-0 border-t border-slate-200 bg-white px-4 py-4">
+      <div className="sticky bottom-0 border-t border-slate-200 bg-white px-4 pt-4 pb-[max(12px,env(safe-area-inset-bottom))]">
         <div className="mx-auto max-w-3xl">
           <form
             className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-2 py-2"
