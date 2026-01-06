@@ -32,11 +32,28 @@ export default function App() {
       const search = window.location.search;
       window.history.pushState({}, "", `${normalized}${search}`);
     }
+    // Reset connection state when navigating away from chat
+    // The RealtimePanel will be unmounted and its cleanup will disconnect,
+    // but state updates during unmount may not propagate correctly
+    if (normalized !== "/") {
+      setConnectionState("disconnected");
+      setIsOutputAudioBufferActive(false);
+      setConnectionHandlers(null);
+    }
     setRoute(normalized);
   };
 
   useEffect(() => {
-    const handler = () => setRoute(resolveRoute());
+    const handler = () => {
+      const newRoute = resolveRoute();
+      // Reset connection state when navigating away from chat via browser navigation
+      if (newRoute !== "/") {
+        setConnectionState("disconnected");
+        setIsOutputAudioBufferActive(false);
+        setConnectionHandlers(null);
+      }
+      setRoute(newRoute);
+    };
     window.addEventListener("popstate", handler);
     return () => window.removeEventListener("popstate", handler);
   }, []);
