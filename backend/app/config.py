@@ -99,8 +99,14 @@ def google_default_duration_minutes() -> int:
         return 60
 
 
-def frontend_base_url() -> str:
-    return os.getenv("FRONTEND_BASE_URL", "http://127.0.0.1:3000")
+def frontend_base_url(fallback: str | None = None) -> str:
+    """Resolve the frontend base URL (allows overriding via env var or request info)."""
+    env_value = os.getenv("FRONTEND_BASE_URL")
+    if env_value and env_value.strip():
+        return env_value.rstrip("/")
+    if fallback and fallback.strip():
+        return fallback.rstrip("/")
+    return "http://127.0.0.1:3000"
 
 
 def is_prod() -> bool:

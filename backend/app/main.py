@@ -310,7 +310,10 @@ async def google_callback(request: Request, code: str | None = None, state: str 
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     SESSION_STORE.reset_aliases(session_id)
-    response = RedirectResponse(url=f"{config.frontend_base_url().rstrip('/')}/settings?google=connected")
+    fallback_base = str(request.base_url).rstrip("/")
+    response = RedirectResponse(
+        url=f"{config.frontend_base_url(fallback_base)}/settings?google=connected"
+    )
     if needs_cookie:
         apply_cookie(response, session_id)
     return response
