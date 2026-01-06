@@ -1,0 +1,36 @@
+name: Generate backend requirements
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  generate-requirements:
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Regenerate requirements
+        run: python backend/scripts/generate_requirements.py
+
+      - name: Rebase requirements file
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet backend/requirements.txt; then
+            echo "requirements.txt already up to date"
+          else
+            git add backend/requirements.txt
+            git commit -m "chore: regenerate requirements [skip ci]"
+            git push
+          fi
