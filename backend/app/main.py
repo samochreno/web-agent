@@ -5,12 +5,14 @@ from __future__ import annotations
 import json
 import os
 import uuid
+from pathlib import Path
 from typing import Any, Mapping, Tuple
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
 from . import config
@@ -450,3 +452,10 @@ def serialize_google(session: SessionData) -> Mapping[str, Any]:
         "email": connection.email if connection else None,
         "expires_at": connection.expires_at.isoformat() if connection and connection.expires_at else None,
     }
+
+
+_repo_root = Path(__file__).resolve().parents[2]
+_default_frontend_dist = _repo_root / "frontend" / "dist"
+_frontend_dist_dir = Path(os.environ.get("FRONTEND_DIST_DIR") or _default_frontend_dist)
+if _frontend_dist_dir.is_dir():
+    app.mount("/", StaticFiles(directory=str(_frontend_dist_dir), html=True), name="frontend")
