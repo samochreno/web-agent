@@ -34,7 +34,11 @@ export default function App() {
         loading: false,
         error: null,
         user: next.user ?? null,
-        google: next.google ?? { connected: false, email: null, expires_at: null },
+        google: next.google ?? {
+          connected: false,
+          email: null,
+          expires_at: null,
+        },
         prompt: next.prompt,
         realtime: next.realtime,
       });
@@ -69,5 +73,7 @@ export default function App() {
 }
 
 function resolveRoute(): string {
-  return routes.includes(window.location.pathname) ? window.location.pathname : "/";
+  return routes.includes(window.location.pathname)
+    ? window.location.pathname
+    : "/";
 }
