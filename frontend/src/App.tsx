@@ -52,7 +52,7 @@ export default function App() {
   }, [refreshSession]);
 
   return (
-    <main className="min-h-screen bg-slate-100 dark:bg-slate-950">
+    <main className="min-h-screen bg-slate-100 overflow-x-hidden">
       <NavBar currentPath={route} onNavigate={navigate} session={session} />
       {session.error ? (
         <div className="mx-auto mt-4 max-w-4xl rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">

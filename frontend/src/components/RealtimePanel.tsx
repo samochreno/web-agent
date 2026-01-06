@@ -513,104 +513,90 @@ export function RealtimePanel({ className, promptId }: Props) {
     return "Disconnected";
   }, [connectionState]);
 
+
   return (
-    <div className={`w-full flex flex-col gap-4 px-4 py-6 ${className ?? ""}`}>
-      <div className="flex max-lg:flex-col gap-4">
-        <div className="flex flex-col gap-2 rounded-xl bg-white p-4 shadow-sm border border-slate-200">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+    <div
+      className={`relative h-full w-full overflow-hidden rounded-[28px] border border-slate-200/70 bg-gradient-to-b from-slate-50 via-white to-slate-100 px-5 py-6 shadow-xl ${
+        className ?? ""
+      }`}
+    >
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(14,165,233,0.08),transparent_32%),radial-gradient(circle_at_80%_0%,rgba(99,102,241,0.06),transparent_32%),radial-gradient(circle_at_50%_80%,rgba(52,211,153,0.05),transparent_30%)]" />
+
+      <div className="relative flex flex-col gap-4 h-full">
+        <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm backdrop-blur">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="space-y-1">
-              <p className="text-xs uppercase font-semibold text-slate-500">
-                Realtime voice assistant
+              <p className="text-[11px] uppercase tracking-[0.16em] font-semibold text-slate-500">
+                Cortana
               </p>
-              <p className="text-lg font-semibold text-slate-900">
-                Status: {headerStatus}
-              </p>
-              <p className="text-sm text-slate-600">
-                Prompt ID:{" "}
-                <span className="font-mono text-slate-800 truncate max-w-[200px] inline-block align-bottom">
-                  {resolvedPromptId || "Not configured"}
+              <div className="flex items-center gap-2">
+                <p className="text-xl font-semibold text-slate-900">Status</p>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-semibold shadow-sm ${statusBadgeClass}`}
+                >
+                  {headerStatus}
                 </span>
-              </p>
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+
+            <div className="flex w-full flex-wrap items-center justify-end gap-3 max-md:justify-start">
+              <span
+                className={`flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[12px] font-semibold text-slate-700 shadow-sm ${
+                  isOutputAudioBufferActive
+                    ? "border-emerald-200 text-emerald-700"
+                    : ""
+                }`}
+              >
+                <span
+                  className={`h-2 w-2 rounded-full ${
+                    isOutputAudioBufferActive
+                      ? "bg-emerald-500 shadow-[0_0_0_6px_rgba(16,185,129,0.2)]"
+                      : "bg-slate-400"
+                  }`}
+                />
+                {isOutputAudioBufferActive ? "Assistant speaking" : "Idle"}
+              </span>
+
+              <label className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[12px] font-semibold text-slate-700 shadow-sm">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-emerald-500"
+                  checked={isPushToTalk}
+                  onChange={() => setIsPushToTalk((prev) => !prev)}
+                />
+                Push-to-talk
+              </label>
+
               <button
                 onClick={
                   connectionState === CONNECTION_STATES.DISCONNECTED
                     ? handleConnect
                     : handleDisconnect
                 }
-                className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${
+                className={`rounded-full px-4 py-2 text-sm font-semibold shadow-sm transition ${
                   connectionState === CONNECTION_STATES.DISCONNECTED
-                    ? "bg-emerald-600 hover:bg-emerald-500"
-                    : "bg-slate-600 hover:bg-slate-500"
+                    ? "bg-emerald-500 text-white hover:bg-emerald-400"
+                    : "bg-slate-900 text-white hover:bg-slate-800"
                 }`}
               >
                 {connectionState === CONNECTION_STATES.DISCONNECTED
                   ? "Connect"
                   : "Disconnect"}
               </button>
-              <label className="flex items-center gap-2 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={isPushToTalk}
-                  onChange={() => setIsPushToTalk((prev) => !prev)}
-                />
-                Push-to-talk
-              </label>
-              <span
-                className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                  isOutputAudioBufferActive
-                    ? "bg-emerald-100 text-emerald-800"
-                    : "bg-slate-100 text-slate-700"
-                }`}
-              >
-                {isOutputAudioBufferActive ? "Assistant speaking" : "Idle"}
-              </span>
             </div>
           </div>
+
           {connectionError ? (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 shadow-inner">
               {connectionError}
             </div>
           ) : null}
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-slate-800">Connection</p>
-            <span
-              className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                connectionState === CONNECTION_STATES.CONNECTED
-                  ? "bg-emerald-100 text-emerald-800"
-                  : connectionState === CONNECTION_STATES.CONNECTING
-                  ? "bg-amber-100 text-amber-800"
-                  : "bg-slate-100 text-slate-600"
-              }`}
-            >
-              {headerStatus}
-            </span>
-          </div>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm text-slate-700">
-            <dt>Prompt</dt>
-            <dd className="font-mono text-[13px] text-slate-900 truncate">
-              {resolvedPromptId || "None"}
-            </dd>
-            <dt>API base</dt>
-            <dd className="text-slate-900">
-              {sessionDetails?.apiBase || deriveApiBase(undefined)}
-            </dd>
-            <dt>Audio mode</dt>
-            <dd className="text-slate-900">
-              {isPushToTalk ? "Push-to-talk" : "Voice activity"}
-            </dd>
-          </dl>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 h-full min-h-[420px]">
-        <div className="flex flex-col rounded-xl bg-white shadow-sm border border-slate-200 overflow-hidden min-h-[360px]">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-            <div className="text-sm font-semibold text-slate-800">
+        <div className="flex min-h-[420px] flex-col gap-3 rounded-2xl border border-slate-200 bg-white/90 shadow-sm backdrop-blur h-full">
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
               Transcript
             </div>
             {isPushToTalk && connectionState === CONNECTION_STATES.CONNECTED ? (
@@ -620,17 +606,18 @@ export function RealtimePanel({ className, promptId }: Props) {
                 onMouseLeave={handleTalkUp}
                 onTouchStart={handleTalkDown}
                 onTouchEnd={handleTalkUp}
-                className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                className={`rounded-full px-4 py-2 text-sm font-semibold shadow-sm transition ${
                   isTalking
-                    ? "bg-rose-600 text-white"
-                    : "bg-emerald-600 text-white"
+                    ? "bg-rose-500 text-white hover:bg-rose-400"
+                    : "bg-emerald-500 text-white hover:bg-emerald-400"
                 }`}
               >
                 {isTalking ? "Release to send" : "Hold to talk"}
               </button>
             ) : null}
           </div>
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+
+          <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
             {messages.length === 0 ? (
               <p className="text-sm text-slate-500">
                 Start speaking or type a message to begin.
@@ -639,15 +626,15 @@ export function RealtimePanel({ className, promptId }: Props) {
               messages.map((message) => (
                 <div
                   key={message.id}
-                  className={`flex flex-col gap-1 rounded-lg border px-3 py-2 ${
+                  className={`flex flex-col gap-1 max-w-3xl rounded-2xl border px-4 py-3 shadow-sm transition ${
                     message.role === "user"
-                      ? "border-blue-100 bg-blue-50"
+                      ? "self-end border-sky-200 bg-sky-50 text-sky-900"
                       : message.role === "tool"
-                      ? "border-amber-100 bg-amber-50"
-                      : "border-slate-200 bg-white"
+                      ? "self-start border-amber-200 bg-amber-50 text-amber-900"
+                      : "self-start border-slate-200 bg-slate-50 text-slate-900"
                   }`}
                 >
-                  <div className="flex items-center justify-between text-xs uppercase tracking-wide text-slate-500">
+                  <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-slate-500">
                     <span>
                       {message.role === "assistant"
                         ? "Assistant"
@@ -659,23 +646,24 @@ export function RealtimePanel({ className, promptId }: Props) {
                       {message.status === "done" ? "Done" : "Live"}
                     </span>
                   </div>
-                  <p className="text-sm text-slate-800 whitespace-pre-line">
+                  <p className="text-sm leading-6 text-slate-900 whitespace-pre-line">
                     {message.text || "…"}
                   </p>
                 </div>
               ))
             )}
           </div>
+
           <form
-            className="border-t border-slate-200 p-3 flex items-center gap-2"
+            className="flex items-center gap-3 border-t border-slate-100 bg-slate-50/80 px-5 py-4"
             onSubmit={handleTextSubmit}
           >
             <input
               type="text"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="Type a message to send to the same stream"
-              className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              placeholder="Ask anything"
+              className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-inner outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/30 disabled:opacity-60"
               disabled={connectionState !== CONNECTION_STATES.CONNECTED}
             />
             <button
@@ -684,9 +672,9 @@ export function RealtimePanel({ className, promptId }: Props) {
                 connectionState !== CONNECTION_STATES.CONNECTED ||
                 !inputText.trim()
               }
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+              className="rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white shadow-md transition hover:bg-emerald-400 disabled:opacity-60"
             >
-              Send
+              &rarr;
             </button>
           </form>
         </div>
