@@ -7,6 +7,7 @@ import os
 import uuid
 from pathlib import Path
 from typing import Any, Mapping, Tuple
+import logging
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
@@ -32,6 +33,10 @@ from .sessions import SessionStore
 from .tools import ToolExecutor
 
 app = FastAPI(title="Realtime Assistant API")
+logger = logging.getLogger("uvicorn.error")
+
+# Build metadata (optional env var for deployed SHA)
+BUILD_HASH = os.getenv("BUILD_HASH", "unknown")
 
 app.add_middleware(
     CORSMiddleware,
@@ -280,9 +285,8 @@ async def update_calendars(request: Request) -> JSONResponse:
 
 @app.get("/api/google/auth-url")
 async def google_auth(request: Request) -> JSONResponse:
+    logger.info("google_auth start", extra={"path": str(request.url)})
     session_id, session, needs_cookie = ensure_session(request)
-    if not session.user:
-        return respond({"error": "Login required."}, 401, session_id if needs_cookie else None, needs_cookie)
 
     redirect_uri = _runtime_google_redirect_uri(request)
     try:
@@ -295,7 +299,13 @@ async def google_auth(request: Request) -> JSONResponse:
             needs_cookie,
         )
 
+    logger.info("google_auth success", extra={"url": url})
     return respond({"url": url}, 200, session_id if needs_cookie else None, needs_cookie)
+
+
+@app.get("/api/version")
+async def version() -> Mapping[str, str]:
+    return {"version": BUILD_HASH}
 
 
 @app.get("/api/google/callback")
