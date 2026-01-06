@@ -564,7 +564,7 @@ export function RealtimePanel({
 
   return (
     <div
-      className={`relative flex h-full w-full flex-col bg-white ${
+      className={`relative flex h-full min-h-0 w-full flex-col bg-white ${
         className ?? ""
       }`}
     >
@@ -576,8 +576,8 @@ export function RealtimePanel({
       )}
 
       {/* Scrollable messages area */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-3xl px-4 py-6">
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        <div className="mx-auto max-w-3xl px-4 py-6 pb-28">
           {messages.length === 0 ? (
             <div className="flex h-full items-center justify-center py-20">
               <p className="text-sm text-slate-400">

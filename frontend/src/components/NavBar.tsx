@@ -37,8 +37,8 @@ export function NavBar({
   }, [connectionState]);
 
   return (
-    <header className="w-full border-b border-slate-200 bg-white">
-      <div className="flex items-center justify-between px-4 py-3 h-12">
+    <header className="sticky top-0 z-30 w-full border-b border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+      <div className="flex items-center justify-between px-4 py-3 h-12 pt-[max(12px,env(safe-area-inset-top))]">
         <div className="flex items-center gap-3">
           {/* Hamburger menu button */}
           <button

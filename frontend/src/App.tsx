@@ -88,7 +88,7 @@ export default function App() {
   }, [refreshSession]);
 
   return (
-    <main className="flex min-h-[100dvh] bg-slate-100 overflow-hidden">
+    <main className="flex h-[100dvh] bg-slate-100 overflow-hidden">
       <Sidebar
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
