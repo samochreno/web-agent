@@ -80,6 +80,7 @@ export function RealtimePanel({ className, promptId }: Props) {
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
   const cleanupRef = useRef<() => void>(() => {});
+  const hasAutoConnectedRef = useRef(false);
 
   const [connectionState, setConnectionState] = useState<ConnectionState>(
     CONNECTION_STATES.DISCONNECTED
@@ -91,12 +92,8 @@ export function RealtimePanel({ className, promptId }: Props) {
   const [isPushToTalk, setIsPushToTalk] = useState(false);
   const [isTalking, setIsTalking] = useState(false);
   const [inputText, setInputText] = useState("");
-  const [sessionDetails, setSessionDetails] = useState<{
-    prompt?: string;
-    apiBase: string;
-  } | null>(null);
 
-  const resolvedPromptId = promptId || sessionDetails?.prompt;
+  const resolvedPromptId = promptId;
 
   const addOrUpdateMessage = useCallback(
     (
@@ -145,7 +142,6 @@ export function RealtimePanel({ className, promptId }: Props) {
     setMessages([]);
     setIsTalking(false);
     setIsOutputAudioBufferActive(false);
-    setSessionDetails(null);
     setConnectionState(CONNECTION_STATES.DISCONNECTED);
   }, []);
 
@@ -358,7 +354,7 @@ export function RealtimePanel({ className, promptId }: Props) {
     const session: Record<string, unknown> = {
       modalities: ["text", "audio"],
       // input_audio_transcription: { model: "whisper-1" },
-      turn_detection: turnDetection,
+      // turn_detection: turnDetection,
       tools: realtimeTools,
     };
 
@@ -415,7 +411,6 @@ export function RealtimePanel({ className, promptId }: Props) {
       };
 
       dc.addEventListener("open", () => {
-        setSessionDetails({ prompt: resolvedPromptId, apiBase });
         sendSessionUpdate();
       });
       dc.addEventListener("message", (event: MessageEvent<string>) => {
@@ -507,12 +502,30 @@ export function RealtimePanel({ className, promptId }: Props) {
     }
   }, [connectionState, isPushToTalk, resolvedPromptId, sendSessionUpdate]);
 
+  useEffect(() => {
+    if (hasAutoConnectedRef.current) return;
+    if (connectionState !== CONNECTION_STATES.DISCONNECTED) return;
+    if (!resolvedPromptId) return;
+
+    hasAutoConnectedRef.current = true;
+    void handleConnect();
+  }, [connectionState, handleConnect, resolvedPromptId]);
+
   const headerStatus = useMemo(() => {
     if (connectionState === CONNECTION_STATES.CONNECTED) return "Live";
     if (connectionState === CONNECTION_STATES.CONNECTING) return "Connecting";
     return "Disconnected";
   }, [connectionState]);
 
+  const statusBadgeClass = useMemo(() => {
+    if (connectionState === CONNECTION_STATES.CONNECTED) {
+      return "bg-emerald-100 text-emerald-800";
+    }
+    if (connectionState === CONNECTION_STATES.CONNECTING) {
+      return "bg-amber-100 text-amber-800";
+    }
+    return "bg-slate-100 text-slate-600";
+  }, [connectionState]);
 
   return (
     <div
