@@ -28,9 +28,9 @@ export default function App() {
 
   const navigate = (path: string) => {
     const normalized = routes.includes(path) ? path : "/";
-    if (window.location.pathname !== normalized) {
-      const search = window.location.search;
-      window.history.pushState({}, "", `${normalized}${search}`);
+    const currentHash = window.location.hash.slice(1) || "/";
+    if (currentHash !== normalized) {
+      window.location.hash = normalized;
     }
     // Reset connection state when navigating away from chat
     // The RealtimePanel will be unmounted and its cleanup will disconnect,
@@ -54,8 +54,8 @@ export default function App() {
       }
       setRoute(newRoute);
     };
-    window.addEventListener("popstate", handler);
-    return () => window.removeEventListener("popstate", handler);
+    window.addEventListener("hashchange", handler);
+    return () => window.removeEventListener("hashchange", handler);
   }, []);
 
   const refreshSession = useCallback(async () => {
@@ -132,7 +132,6 @@ export default function App() {
 }
 
 function resolveRoute(): string {
-  return routes.includes(window.location.pathname)
-    ? window.location.pathname
-    : "/";
+  const hash = window.location.hash.slice(1) || "/";
+  return routes.includes(hash) ? hash : "/";
 }
