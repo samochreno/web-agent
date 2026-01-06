@@ -206,8 +206,6 @@ async def realtime_tool(request: Request) -> JSONResponse:
 @app.get("/api/calendars")
 async def calendars(request: Request) -> JSONResponse:
     session_id, session, needs_cookie = ensure_session(request)
-    if not session.user:
-        return respond({"error": "Login required."}, 401, session_id if needs_cookie else None, needs_cookie)
     if not session.google:
         return respond({"error": "Google is not connected."}, 403, session_id if needs_cookie else None, needs_cookie)
 
@@ -243,8 +241,6 @@ async def calendars(request: Request) -> JSONResponse:
 @app.post("/api/calendars/visible")
 async def update_calendars(request: Request) -> JSONResponse:
     session_id, session, needs_cookie = ensure_session(request)
-    if not session.user:
-        return respond({"error": "Login required."}, 401, session_id if needs_cookie else None, needs_cookie)
     if not session.google:
         return respond({"error": "Google is not connected."}, 403, session_id if needs_cookie else None, needs_cookie)
 
