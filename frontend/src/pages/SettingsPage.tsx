@@ -79,109 +79,153 @@ export function SettingsPage({ session, refreshSession }: Props) {
   };
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6">
-      <div className="grid gap-4 md:grid-cols-2">
-        <InfoCard
-          title="Account"
-          footer="Sessions are stored in a secure cookie. Use a recognizable email so tool calls and state variables stay scoped to you."
-        >
-          {session.user ? (
-            <div className="flex flex-col gap-2">
-              <p className="text-sm font-semibold text-slate-900">
-                {session.user.email}
-              </p>
-              {session.user.name ? (
-                <p className="text-sm text-slate-700">{session.user.name}</p>
-              ) : null}
-              <div className="flex items-center gap-2">
+    <div className="mx-auto flex max-w-6xl flex-col gap-4">
+      <div className="relative w-full overflow-hidden rounded-[28px] border border-slate-200/70 bg-gradient-to-b from-slate-50 via-white to-slate-100 px-5 py-6 shadow-xl">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(14,165,233,0.08),transparent_32%),radial-gradient(circle_at_80%_0%,rgba(99,102,241,0.06),transparent_32%),radial-gradient(circle_at_50%_80%,rgba(52,211,153,0.05),transparent_30%)]" />
+
+        <div className="relative flex flex-col gap-6">
+          {/* Account Section */}
+          <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm backdrop-blur">
+            <div className="flex items-center gap-2 pb-2">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              <h3 className="text-base font-semibold text-slate-900">
+                Account
+              </h3>
+            </div>
+            {session.user ? (
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-sky-500 text-sm font-bold text-white shadow-md">
+                    {session.user.email.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      {session.user.email}
+                    </p>
+                    {session.user.name ? (
+                      <p className="text-sm text-slate-600">
+                        {session.user.name}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
                 <button
                   onClick={() => void handleLogout()}
-                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                  className="w-fit rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
                 >
                   Sign out
                 </button>
               </div>
-            </div>
-          ) : (
-            <LoginForm onLogin={handleLogin} />
-          )}
-        </InfoCard>
-      </div>
+            ) : (
+              <LoginForm onLogin={handleLogin} />
+            )}
+            <p className="pt-2 text-xs text-slate-500">
+              Sessions are stored in a secure cookie. Use a recognizable email
+              so tool calls and state variables stay scoped to you.
+            </p>
+          </div>
 
-      <InfoCard
-        title="Google connection + shared calendars"
-        footer="Selecting calendars controls which ones feed into list_events, with readonly flags applied for shared calendars."
-      >
-        <div className="space-y-3">
-          <p className="text-sm text-slate-700">
-            Connect Google to unlock the scheduling tools. IDs stay masked
-            through aliasing so the model never sees raw Google identifiers, and
-            readonly shared calendars are filtered into the tool output with
-            write protection.
-          </p>
-          {googleNotice ? (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
-              Google connected — you can now choose which calendars are shared.
+          {/* Google Connection Section */}
+          <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm backdrop-blur">
+            <div className="flex items-center gap-2 pb-2">
+              <span className="h-2 w-2 rounded-full bg-sky-500" />
+              <h3 className="text-base font-semibold text-slate-900">
+                Google Connection
+              </h3>
             </div>
-          ) : null}
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-800">
-              {session.google.connected ? "Connected" : "Disconnected"}
-            </span>
-            <span className="text-sm text-slate-700">
-              {session.google.connected
-                ? session.google.email || "Google account"
-                : "No Google account linked"}
-            </span>
-            <div className="flex items-center gap-2">
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Connect Google to unlock the scheduling tools. IDs stay masked
+              through aliasing so the model never sees raw Google identifiers.
+            </p>
+            {googleNotice ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 shadow-inner">
+                Google connected — you can now choose which calendars are
+                shared.
+              </div>
+            ) : null}
+            <div className="flex items-center gap-3 flex-wrap">
+              <span
+                className={`flex items-center gap-2 rounded-full border px-3 py-1 text-[12px] font-semibold shadow-sm ${
+                  session.google.connected
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-slate-200 bg-slate-50 text-slate-600"
+                }`}
+              >
+                <span
+                  className={`h-2 w-2 rounded-full ${
+                    session.google.connected
+                      ? "bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.2)]"
+                      : "bg-slate-400"
+                  }`}
+                />
+                {session.google.connected ? "Connected" : "Disconnected"}
+              </span>
+              <span className="text-sm text-slate-600">
+                {session.google.connected
+                  ? session.google.email || "Google account"
+                  : "No Google account linked"}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
               {session.google.connected ? (
                 <button
                   onClick={() => void handleGoogleDisconnect()}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-50"
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-slate-50"
                 >
                   Disconnect
                 </button>
               ) : (
                 <button
                   onClick={() => void handleGoogleConnect()}
-                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                  className="rounded-full bg-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-400"
                 >
                   Connect Google
                 </button>
               )}
             </div>
-          </div>
-        </div>
-      </InfoCard>
-
-      <InfoCard title="Calendar visibility">
-        {session.google.connected ? (
-          <div className="space-y-3">
-            {loadingCalendars ? (
-              <p className="text-sm text-slate-500">Loading calendars…</p>
-            ) : calendarError ? (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                {calendarError}
-              </div>
-            ) : (
-              <CalendarSelector
-                calendars={calendars}
-                onChange={handleCalendarChange}
-              />
-            )}
-            <p className="text-xs text-slate-500">
-              Primary calendars are always included. Readonly calendars appear
-              in agent responses but tool updates are blocked to keep shared
-              data safe.
+            <p className="pt-2 text-xs text-slate-500">
+              Selecting calendars controls which ones feed into list_events,
+              with readonly flags applied for shared calendars.
             </p>
           </div>
-        ) : (
-          <p className="text-sm text-slate-600">
-            Connect your Google account to pick which calendars are shared with
-            the agent. Primary will always be included with aliases.
-          </p>
-        )}
-      </InfoCard>
+
+          {/* Calendar Visibility Section */}
+          <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm backdrop-blur">
+            <div className="flex items-center gap-2 pb-2">
+              <span className="h-2 w-2 rounded-full bg-amber-500" />
+              <h3 className="text-base font-semibold text-slate-900">
+                Calendar Visibility
+              </h3>
+            </div>
+            {session.google.connected ? (
+              <div className="space-y-3">
+                {loadingCalendars ? (
+                  <p className="text-sm text-slate-500">Loading calendars…</p>
+                ) : calendarError ? (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 shadow-inner">
+                    {calendarError}
+                  </div>
+                ) : (
+                  <CalendarSelector
+                    calendars={calendars}
+                    onChange={handleCalendarChange}
+                  />
+                )}
+                <p className="text-xs text-slate-500">
+                  Primary calendars are always included. Readonly calendars
+                  appear in agent responses but tool updates are blocked to keep
+                  shared data safe.
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-slate-600">
+                Connect your Google account to pick which calendars are shared
+                with the agent. Primary will always be included with aliases.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
