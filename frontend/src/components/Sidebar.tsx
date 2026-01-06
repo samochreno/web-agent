@@ -69,7 +69,7 @@ export function Sidebar({ isOpen, onClose, currentPath, onNavigate }: Props) {
         }`}
       >
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4">
-          <span className="text-lg font-semibold text-slate-900">Cortana</span>
+          <span className="text-lg font-semibold text-slate-900">Luna</span>
           <button
             onClick={onClose}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition"

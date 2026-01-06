@@ -59,7 +59,7 @@ self.addEventListener("fetch", (event) => {
 
 self.addEventListener("push", (event) => {
   const data = event.data?.json() ?? {
-    title: "Cortana",
+    title: "Luna",
     body: "You have a new update.",
   };
   const title = data.title;

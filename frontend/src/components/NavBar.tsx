@@ -71,9 +71,7 @@ export function NavBar({
                       : "bg-slate-400"
                   }`}
                 />
-                <span className="text-sm font-medium text-slate-700">
-                  Cortana
-                </span>
+                <span className="text-sm font-medium text-slate-700">Luna</span>
               </div>
               <span
                 className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusBadgeClass}`}

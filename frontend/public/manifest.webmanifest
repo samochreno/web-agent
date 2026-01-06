@@ -1,6 +1,6 @@
 {
-  "name": "Cortana Assistant",
-  "short_name": "Cortana",
+  "name": "Luna",
+  "short_name": "Luna",
   "description": "Realtime GPT assistant with voice + text streaming and Google productivity tools.",
   "start_url": "/",
   "scope": "/",

@@ -609,7 +609,7 @@ export function RealtimePanel({
                       {message.role !== "user" && (
                         <div className="mb-1 flex items-center gap-2">
                           <span className="text-xs font-medium text-slate-500">
-                            {message.role === "assistant" ? "Cortana" : "Tool"}
+                            {message.role === "assistant" ? "Luna" : "Tool"}
                           </span>
                           {message.status === "in_progress" && (
                             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -723,7 +723,7 @@ export function RealtimePanel({
             </button>
           </form>
           <p className="mt-2 text-center text-xs text-slate-400">
-            Cortana can make mistakes. Check important info.
+            Luna can make mistakes. Check important info.
           </p>
         </div>
       </div>
