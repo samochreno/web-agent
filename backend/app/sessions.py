@@ -2,9 +2,15 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timedelta
-from typing import Dict, Tuple
+from typing import Dict, Tuple, NamedTuple
 
 from .models import SessionData
+
+
+class StateEntry(NamedTuple):
+    session_id: str
+    expires_at: datetime
+    native_scheme: str | None = None
 
 
 class SessionStore:
@@ -12,7 +18,7 @@ class SessionStore:
 
     def __init__(self) -> None:
         self._sessions: Dict[str, SessionData] = {}
-        self._state_index: Dict[str, Tuple[str, datetime]] = {}
+        self._state_index: Dict[str, StateEntry] = {}
 
     def ensure(self, session_id: str | None) -> Tuple[str, SessionData]:
         if session_id and session_id in self._sessions:
@@ -30,21 +36,27 @@ class SessionStore:
     def clear(self, session_id: str) -> None:
         self._sessions.pop(session_id, None)
 
-    def remember_state(self, state: str, session_id: str, ttl_seconds: int = 900) -> None:
+    def remember_state(
+        self, state: str, session_id: str, ttl_seconds: int = 900, native_scheme: str | None = None
+    ) -> None:
         """Map an OAuth state token to a session id (helps when Safari drops cookies)."""
-        self._state_index[state] = (session_id, datetime.utcnow() + timedelta(seconds=ttl_seconds))
+        self._state_index[state] = StateEntry(
+            session_id=session_id,
+            expires_at=datetime.utcnow() + timedelta(seconds=ttl_seconds),
+            native_scheme=native_scheme,
+        )
 
-    def consume_state(self, state: str) -> str | None:
+    def consume_state(self, state: str) -> Tuple[str | None, str | None]:
+        """Returns (session_id, native_scheme) or (None, None) if not found/expired."""
         entry = self._state_index.pop(state, None)
         if not entry:
-            return None
-        session_id, expires_at = entry
-        if expires_at < datetime.utcnow():
-            return None
-        return session_id
+            return None, None
+        if entry.expires_at < datetime.utcnow():
+            return None, None
+        return entry.session_id, entry.native_scheme
 
     def prune_states(self) -> None:
         now = datetime.utcnow()
-        expired = [key for key, (_, exp) in self._state_index.items() if exp < now]
+        expired = [key for key, entry in self._state_index.items() if entry.expires_at < now]
         for key in expired:
             self._state_index.pop(key, None)

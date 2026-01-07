@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { CalendarSelector } from "../components/CalendarSelector";
 import {
   disconnectGoogle,
@@ -7,6 +7,13 @@ import {
   updateVisibleCalendars,
   type CalendarOption,
 } from "../lib/api";
+import {
+  openAuthUrl,
+  listenForOAuthCallback,
+  getOAuthRedirectUri,
+  getNativeScheme,
+} from "../lib/auth";
+import { isNativePlatform } from "../lib/config";
 import type { SessionState } from "../types";
 
 type Props = {
@@ -18,6 +25,21 @@ export function SettingsPage({ session, refreshSession }: Props) {
   const [calendars, setCalendars] = useState<CalendarOption[]>([]);
   const [calendarError, setCalendarError] = useState<string | null>(null);
   const [loadingCalendars, setLoadingCalendars] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
+
+  // Listen for OAuth callbacks on native platforms
+  useEffect(() => {
+    const cleanup = listenForOAuthCallback(async (success) => {
+      setAuthLoading(false);
+      if (success) {
+        await refreshSession();
+      } else {
+        setCalendarError("Google authentication failed");
+      }
+    });
+
+    return cleanup;
+  }, [refreshSession]);
 
   useEffect(() => {
     if (session.google.connected) {
@@ -43,8 +65,26 @@ export function SettingsPage({ session, refreshSession }: Props) {
   };
 
   const handleGoogleConnect = async () => {
-    const { url } = await googleAuthUrl();
-    window.location.href = url;
+    setAuthLoading(true);
+    setCalendarError(null);
+    try {
+      // Pass redirect URI and native scheme for native apps
+      const redirectUri = getOAuthRedirectUri();
+      const nativeScheme = getNativeScheme();
+      const { url } = await googleAuthUrl(redirectUri, nativeScheme);
+      await openAuthUrl(url);
+      // On web, this will redirect away, so we won't reach here
+      // On native, the browser opens and we wait for the deep link callback
+      if (!isNativePlatform()) {
+        // Reset loading state only for native (web will navigate away)
+        setAuthLoading(false);
+      }
+    } catch (err) {
+      setCalendarError(
+        err instanceof Error ? err.message : "Failed to start authentication"
+      );
+      setAuthLoading(false);
+    }
   };
 
   const handleGoogleDisconnect = async () => {
@@ -96,9 +136,10 @@ export function SettingsPage({ session, refreshSession }: Props) {
             ) : (
               <button
                 onClick={() => void handleGoogleConnect()}
-                className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+                disabled={authLoading}
+                className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Connect Google
+                {authLoading ? "Connecting…" : "Connect Google"}
               </button>
             )}
 

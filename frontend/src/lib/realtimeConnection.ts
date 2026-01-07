@@ -13,6 +13,46 @@ export type RealtimeConnection = {
   dc: RTCDataChannel;
 };
 
+type LegacyGetUserMedia = (
+  constraints: MediaStreamConstraints,
+  success: (stream: MediaStream) => void,
+  failure: (error: DOMException | MediaStreamError) => void
+) => void;
+
+type LegacyNavigator = Navigator & {
+  webkitGetUserMedia?: LegacyGetUserMedia;
+  mozGetUserMedia?: LegacyGetUserMedia;
+  msGetUserMedia?: LegacyGetUserMedia;
+};
+
+const getMicrophoneStream = async (): Promise<MediaStream> => {
+  const mediaDevices = navigator.mediaDevices;
+  if (mediaDevices?.getUserMedia) {
+    return mediaDevices.getUserMedia({ audio: true });
+  }
+
+  const legacyNavigator = navigator as LegacyNavigator;
+  const legacyGetUserMedia =
+    legacyNavigator.webkitGetUserMedia ??
+    legacyNavigator.mozGetUserMedia ??
+    legacyNavigator.msGetUserMedia;
+
+  if (!legacyGetUserMedia) {
+    throw new Error(
+      "Microphone capture is not supported by this environment."
+    );
+  }
+
+  return new Promise<MediaStream>((resolve, reject) => {
+    legacyGetUserMedia.call(
+      navigator,
+      { audio: true },
+      resolve,
+      reject as (err: DOMException | MediaStreamError) => void
+    );
+  });
+};
+
 export async function createRealtimeConnection({
   apiBase,
   clientSecret,
@@ -32,9 +72,7 @@ export async function createRealtimeConnection({
     }
   };
 
-  const mediaStream = await navigator.mediaDevices.getUserMedia({
-    audio: true,
-  });
+  const mediaStream = await getMicrophoneStream();
   if (abortSignal?.aborted) {
     mediaStream.getTracks().forEach((track) => track.stop());
     pc.close();

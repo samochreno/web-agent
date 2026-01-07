@@ -1,7 +1,7 @@
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createRealtimeConnection } from "../lib/realtimeConnection";
-import { createRealtimeSession } from "../lib/api";
+import { callRealtimeTool, createRealtimeSession } from "../lib/api";
 import { realtimeTools } from "../lib/realtimeTools";
 import type { ConnectionState } from "../types";
 
@@ -200,21 +200,12 @@ export function RealtimePanel({
 
   const runTool = useCallback(async (call: FunctionCallPayload) => {
     try {
-      const response = await fetch("/api/realtime/tool", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: call.name,
-          arguments: call.arguments ?? {},
-        }),
+      const payload = await callRealtimeTool({
+        name: call.name,
+        arguments: call.arguments ?? {},
       });
-      const payload = (await response.json().catch(() => ({}))) as {
-        result?: unknown;
-        error?: string;
-      };
-      if (!response.ok) {
-        throw new Error(payload.error || "Tool execution failed");
+      if (payload.result === undefined && !payload.error) {
+        console.warn("Realtime tool returned empty result", payload);
       }
       return payload.result ?? {};
     } catch (err) {

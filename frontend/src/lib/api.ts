@@ -1,3 +1,42 @@
+import { getApiBaseUrl } from "./config";
+
+type CapacitorHttpPayload = {
+  status: number;
+  data: unknown;
+  headers?: Record<string, string>;
+};
+
+function isCapacitorHttpPayload(value: unknown): value is CapacitorHttpPayload {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "status" in value &&
+    typeof (value as Record<string, unknown>).status === "number" &&
+    "data" in value &&
+    typeof (value as Record<string, unknown>).data !== "undefined" &&
+    "headers" in value &&
+    (typeof (value as Record<string, unknown>).headers === "object" ||
+      typeof (value as Record<string, unknown>).headers === "undefined")
+  );
+}
+
+export function normalizeApiResponsePayload<T>(value: unknown): T {
+  // CapacitorHttp returns the JSON body under `data` with status/headers alongside.
+  if (isCapacitorHttpPayload(value)) {
+    return normalizeApiResponsePayload<T>((value as CapacitorHttpPayload).data);
+  }
+  // Some environments hand us a JSON string; try to parse then re-run normalization.
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return normalizeApiResponsePayload<T>(parsed);
+    } catch {
+      // fall through and return the raw string
+    }
+  }
+  return value as T;
+}
+
 export type UserProfile = { id: string; email: string; name?: string | null };
 export type GoogleStatus = {
   connected: boolean;
@@ -23,7 +62,10 @@ export type CalendarOption = {
 };
 
 async function fetchJson<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(path, {
+  // Prepend the API base URL for native platforms
+  const url = `${getApiBaseUrl()}${path}`;
+
+  const response = await fetch(url, {
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
@@ -32,22 +74,36 @@ async function fetchJson<T>(path: string, init: RequestInit = {}): Promise<T> {
     ...init,
   });
 
-  const payload = (await response.json().catch(() => ({}))) as {
-    error?: string;
-  };
+  const payload = (await response.json().catch(() => ({})));
+  const normalizedPayload = normalizeApiResponsePayload<unknown>(payload);
+  const normalizedError =
+    (normalizedPayload &&
+      typeof normalizedPayload === "object" &&
+      "error" in normalizedPayload &&
+      (normalizedPayload as { error?: string }).error) ||
+    (payload as { error?: string }).error;
   if (!response.ok) {
-    throw new Error(payload.error || "Request failed");
+    throw new Error(normalizedError || "Request failed");
   }
 
-  return payload as T;
+  return normalizedPayload as T;
 }
 
 export async function getSession(): Promise<SessionResponse> {
   return fetchJson<SessionResponse>("/api/auth/session");
 }
 
-export async function googleAuthUrl(): Promise<{ url: string }> {
-  return fetchJson<{ url: string }>("/api/google/auth-url");
+export async function googleAuthUrl(
+  redirectUri?: string,
+  nativeScheme?: string
+): Promise<{ url: string }> {
+  const params = new URLSearchParams();
+  if (redirectUri) params.set("redirect_uri", redirectUri);
+  if (nativeScheme) params.set("native", nativeScheme);
+  const queryString = params.toString();
+  return fetchJson<{ url: string }>(
+    `/api/google/auth-url${queryString ? `?${queryString}` : ""}`
+  );
 }
 
 export async function disconnectGoogle() {
@@ -86,5 +142,14 @@ export async function createRealtimeSession(
     method: "POST",
     body: JSON.stringify(promptId ? { prompt: { id: promptId } } : {}),
     signal,
+  });
+}
+
+export async function callRealtimeTool(
+  payload: { name: string; arguments: unknown }
+): Promise<{ result?: unknown; error?: string }> {
+  return fetchJson<{ result?: unknown; error?: string }>("/api/realtime/tool", {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }

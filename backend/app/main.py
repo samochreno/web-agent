@@ -280,14 +280,16 @@ async def update_calendars(request: Request) -> JSONResponse:
 
 
 @app.get("/api/google/auth-url")
-async def google_auth(request: Request) -> JSONResponse:
+async def google_auth(request: Request, redirect_uri: str | None = None, native: str | None = None) -> JSONResponse:
     logger.info("google_auth start", extra={"path": str(request.url)})
     session_id, session, needs_cookie = ensure_session(request)
 
-    redirect_uri = _runtime_google_redirect_uri(request)
+    # Use custom redirect_uri if provided (for native apps), otherwise derive from request
+    effective_redirect_uri = redirect_uri or _runtime_google_redirect_uri(request)
     try:
-        url, state = build_google_auth_url(session, redirect_uri)
-        SESSION_STORE.remember_state(state, session_id)
+        url, state = build_google_auth_url(session, effective_redirect_uri)
+        # Store session and native flag for the callback
+        SESSION_STORE.remember_state(state, session_id, native_scheme=native)
     except GoogleNotConfigured:
         return respond(
             {"error": "Google OAuth is not configured."},
@@ -306,28 +308,42 @@ async def version() -> Mapping[str, str]:
 
 
 @app.get("/api/google/callback")
-async def google_callback(request: Request, code: str | None = None, state: str | None = None):
+async def google_callback(
+    request: Request,
+    code: str | None = None,
+    state: str | None = None,
+    redirect_uri: str | None = None,
+):
     session_id, session, needs_cookie = ensure_session(request)
     if not code or not state:
         raise HTTPException(status_code=400, detail="Missing OAuth parameters.")
 
     # If Safari dropped the cookie, try to recover the session via the state lookup.
-    recovered_session_id = SESSION_STORE.consume_state(state)
+    # Also retrieve the native scheme if this was a native app request.
+    recovered_session_id, native_scheme = SESSION_STORE.consume_state(state)
     if recovered_session_id and recovered_session_id != session_id:
         session_id, session = SESSION_STORE.ensure(recovered_session_id)
         needs_cookie = True
 
-    redirect_uri = _runtime_google_redirect_uri(request)
+    # Use custom redirect_uri if provided (for native apps), otherwise derive from request
+    effective_redirect_uri = redirect_uri or _runtime_google_redirect_uri(request)
     try:
-        await run_in_threadpool(handle_oauth_callback, session, code, state, redirect_uri)
+        await run_in_threadpool(handle_oauth_callback, session, code, state, effective_redirect_uri)
     except GoogleNotConfigured as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     SESSION_STORE.reset_aliases(session_id)
-    fallback_base = _determine_frontend_url(request)
-    response = RedirectResponse(url=_settings_redirect_url(fallback_base))
+
+    # For native apps, redirect to the custom URL scheme
+    if native_scheme:
+        native_redirect = f"{native_scheme}://oauth/callback?success=true"
+        response = RedirectResponse(url=native_redirect)
+    else:
+        fallback_base = _determine_frontend_url(request)
+        response = RedirectResponse(url=_settings_redirect_url(fallback_base))
+
     if needs_cookie:
         apply_cookie(response, session_id)
     return response

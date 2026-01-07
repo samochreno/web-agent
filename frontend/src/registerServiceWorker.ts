@@ -1,3 +1,4 @@
+import { Capacitor } from "@capacitor/core";
 import pkg from "../package.json";
 
 declare const __BUILD_ID__: string;
@@ -14,6 +15,11 @@ const SERVICE_WORKER_URL = `/service-worker.js?v=${encodeURIComponent(
 )}`;
 
 export function registerServiceWorker(): void {
+  // Skip service worker on native platforms - Capacitor handles caching differently
+  if (Capacitor.isNativePlatform()) {
+    return;
+  }
+
   if (import.meta.env.DEV) {
     return;
   }

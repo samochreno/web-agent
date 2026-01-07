@@ -34,8 +34,13 @@ export default defineConfig(({ mode }) => {
     // Allow env files to live one level above the frontend directory
     envDir: path.resolve(__dirname, ".."),
     plugins: [react(), serviceWorkerVersionPlugin()],
+    // Use relative base path for Capacitor native builds to load assets correctly
+    base: "./",
     define: {
       __BUILD_ID__: JSON.stringify(buildId),
+    },
+    build: {
+      outDir: "dist",
     },
     server: {
       port: 3000,

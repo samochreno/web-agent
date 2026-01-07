@@ -71,3 +71,45 @@ project and organization.
 1. Push changes to `main`; the workflow rebuilds the frontend, updates `backend/frontend_dist.tar.gz`, and keeps `backend/requirements.txt` in sync.
 2. Let App Platform install `requirements.txt` and run `./backend/scripts/run.sh` (it already pulls the latest tarball and extracts it).
 3. Ensure required env vars (`OPENAI_API_KEY`, `VITE_REALTIME_PROMPT_ID`, Google credentials, etc.) remain defined for the backend service.
+
+## Mobile (Capacitor)
+
+The app supports native iOS and Android builds via Capacitor.
+
+### Prerequisites
+
+- Xcode 16+ (for iOS)
+- Android Studio (for Android)
+- CocoaPods (`sudo gem install cocoapods`)
+
+### Environment setup
+
+For native builds, set `VITE_API_BASE_URL` to your backend URL before building:
+
+```bash
+# In .env or .env.local
+VITE_API_BASE_URL=https://your-backend.example.com
+```
+
+### Build commands
+
+| Command | Description |
+|---------|-------------|
+| `npm run cap:sync` | Build frontend and sync to native projects |
+| `npm run cap:ios` | Build, sync, and open Xcode |
+| `npm run cap:android` | Build, sync, and open Android Studio |
+| `npm run cap:run:ios` | Build, sync, and run on iOS device/simulator |
+| `npm run cap:run:android` | Build, sync, and run on Android emulator/device |
+
+### Google OAuth for native
+
+Native apps use a custom URL scheme (`luna://`) to handle OAuth callbacks. When connecting Google:
+
+1. The app opens the system browser for Google sign-in
+2. After authentication, Google redirects to your backend
+3. The backend processes the tokens and redirects to `luna://oauth/callback`
+4. The app receives the callback and refreshes the session
+
+For this to work in production:
+- Add your backend's callback URL (`https://your-backend.example.com/api/google/callback`) to your Google OAuth client's authorized redirect URIs
+- The URL scheme `luna` is configured in `ios/App/App/Info.plist`
