@@ -361,13 +361,17 @@ def respond(
 
 
 def apply_cookie(response, cookie_value: str) -> None:
+    # Use SameSite=None in production to allow cookies during OAuth redirects from external domains (e.g., Google).
+    # iOS Safari requires SameSite=None for cross-site OAuth flows to work properly.
+    # SameSite=None requires Secure=True, which is enforced in production.
+    is_production = config.is_prod()
     response.set_cookie(
         key=config.SESSION_COOKIE_NAME,
         value=cookie_value,
         max_age=config.SESSION_COOKIE_MAX_AGE_SECONDS,
         httponly=True,
-        samesite="lax",
-        secure=config.is_prod(),
+        samesite="none" if is_production else "lax",
+        secure=is_production,
         path="/",
     )
 
