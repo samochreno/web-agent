@@ -77,7 +77,7 @@ def build_flow(state: str, redirect_uri: str | None = None) -> Flow:
     )
 
 
-def authorization_url(session: SessionData, redirect_uri: str | None = None) -> str:
+def authorization_url(session: SessionData, redirect_uri: str | None = None) -> tuple[str, str]:
     ensure_google_configured()
     state = str(uuid.uuid4())
     session.oauth_state = state
@@ -87,7 +87,7 @@ def authorization_url(session: SessionData, redirect_uri: str | None = None) -> 
         include_granted_scopes="true",
         prompt="consent",
     )
-    return auth_url
+    return auth_url, state
 
 
 def handle_oauth_callback(

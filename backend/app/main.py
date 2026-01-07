@@ -286,7 +286,8 @@ async def google_auth(request: Request) -> JSONResponse:
 
     redirect_uri = _runtime_google_redirect_uri(request)
     try:
-        url = build_google_auth_url(session, redirect_uri)
+        url, state = build_google_auth_url(session, redirect_uri)
+        SESSION_STORE.remember_state(state, session_id)
     except GoogleNotConfigured:
         return respond(
             {"error": "Google OAuth is not configured."},
@@ -309,6 +310,12 @@ async def google_callback(request: Request, code: str | None = None, state: str 
     session_id, session, needs_cookie = ensure_session(request)
     if not code or not state:
         raise HTTPException(status_code=400, detail="Missing OAuth parameters.")
+
+    # If Safari dropped the cookie, try to recover the session via the state lookup.
+    recovered_session_id = SESSION_STORE.consume_state(state)
+    if recovered_session_id and recovered_session_id != session_id:
+        session_id, session = SESSION_STORE.ensure(recovered_session_id)
+        needs_cookie = True
 
     redirect_uri = _runtime_google_redirect_uri(request)
     try:

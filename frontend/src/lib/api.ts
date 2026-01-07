@@ -79,10 +79,12 @@ export type RealtimeSessionConfig = {
 };
 
 export async function createRealtimeSession(
-  promptId?: string
+  promptId?: string,
+  signal?: AbortSignal
 ): Promise<RealtimeSessionConfig> {
   return fetchJson<RealtimeSessionConfig>("/api/realtime/session", {
     method: "POST",
     body: JSON.stringify(promptId ? { prompt: { id: promptId } } : {}),
+    signal,
   });
 }

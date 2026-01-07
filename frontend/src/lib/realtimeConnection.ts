@@ -5,6 +5,7 @@ export type RealtimeConnectionOptions = {
   clientSecret: string;
   audioElement: RefObject<HTMLAudioElement | null>;
   preferredCodec?: string;
+  abortSignal?: AbortSignal;
 };
 
 export type RealtimeConnection = {
@@ -17,7 +18,12 @@ export async function createRealtimeConnection({
   clientSecret,
   audioElement,
   preferredCodec = "opus",
+  abortSignal,
 }: RealtimeConnectionOptions): Promise<RealtimeConnection> {
+  if (abortSignal?.aborted) {
+    throw new DOMException("Aborted", "AbortError");
+  }
+
   const pc = new RTCPeerConnection();
 
   pc.ontrack = (event) => {
@@ -29,6 +35,11 @@ export async function createRealtimeConnection({
   const mediaStream = await navigator.mediaDevices.getUserMedia({
     audio: true,
   });
+  if (abortSignal?.aborted) {
+    mediaStream.getTracks().forEach((track) => track.stop());
+    pc.close();
+    throw new DOMException("Aborted", "AbortError");
+  }
   const [microphoneTrack] = mediaStream.getAudioTracks();
   if (!microphoneTrack) {
     throw new Error("Microphone unavailable");
@@ -51,6 +62,13 @@ export async function createRealtimeConnection({
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
 
+  if (abortSignal?.aborted) {
+    dc.close();
+    pc.getSenders().forEach((sender) => sender.track?.stop());
+    pc.close();
+    throw new DOMException("Aborted", "AbortError");
+  }
+
   const normalizedBase = apiBase.replace(/\/$/, "");
   const sdpResponse = await fetch(`${normalizedBase}/v1/realtime`, {
     method: "POST",
@@ -60,7 +78,15 @@ export async function createRealtimeConnection({
       "Content-Type": "application/sdp",
       "OpenAI-Beta": "realtime=v1",
     },
+    signal: abortSignal,
   });
+
+  if (abortSignal?.aborted) {
+    dc.close();
+    pc.getSenders().forEach((sender) => sender.track?.stop());
+    pc.close();
+    throw new DOMException("Aborted", "AbortError");
+  }
 
   const answerSdp = await sdpResponse.text();
   const answer: RTCSessionDescriptionInit = { type: "answer", sdp: answerSdp };

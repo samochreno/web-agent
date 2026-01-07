@@ -91,6 +91,8 @@ export function RealtimePanel({
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
   const cleanupRef = useRef<() => void>(() => {});
+  const connectAttemptRef = useRef(0);
+  const connectAbortControllerRef = useRef<AbortController | null>(null);
   const hasAutoConnectedRef = useRef(false);
 
   const [connectionState, setConnectionStateInternal] =
@@ -428,11 +430,28 @@ export function RealtimePanel({
       setConnectionError("Prompt ID is not configured");
       return;
     }
+
+    const attemptId = connectAttemptRef.current + 1;
+    connectAttemptRef.current = attemptId;
+
+    connectAbortControllerRef.current?.abort();
+    const abortController = new AbortController();
+    connectAbortControllerRef.current = abortController;
+
     setConnectionError(null);
     setConnectionState(CONNECTION_STATES.CONNECTING);
 
     try {
-      const ephemeral = await createRealtimeSession(resolvedPromptId);
+      const ephemeral = await createRealtimeSession(
+        resolvedPromptId,
+        abortController.signal
+      );
+      if (
+        abortController.signal.aborted ||
+        attemptId !== connectAttemptRef.current
+      ) {
+        return;
+      }
       const clientSecret = ephemeral.client_secret?.value;
       if (!clientSecret) {
         throw new Error("Missing client secret in response");
@@ -448,7 +467,21 @@ export function RealtimePanel({
         apiBase,
         clientSecret,
         audioElement: audioRef,
+        abortSignal: abortController.signal,
       });
+      if (
+        abortController.signal.aborted ||
+        attemptId !== connectAttemptRef.current
+      ) {
+        try {
+          dc.close();
+        } catch (err) {
+          console.warn("Error closing data channel after abort", err);
+        }
+        pc.getSenders().forEach((sender) => sender.track?.stop());
+        pc.close();
+        return;
+      }
 
       pcRef.current = pc;
       dcRef.current = dc;
@@ -461,6 +494,24 @@ export function RealtimePanel({
       const handleClose = () => {
         resetConnection();
       };
+
+      const localCleanup = () => {
+        dc.removeEventListener("close", handleClose);
+        try {
+          dc.close();
+        } catch (err) {
+          console.warn("Error closing data channel", err);
+        }
+        stopTracks();
+      };
+
+      if (
+        abortController.signal.aborted ||
+        attemptId !== connectAttemptRef.current
+      ) {
+        localCleanup();
+        return;
+      }
 
       dc.addEventListener("open", () => {
         sendSessionUpdate();
@@ -488,25 +539,30 @@ export function RealtimePanel({
         }
       });
 
-      cleanupRef.current = () => {
-        dc.removeEventListener("close", handleClose);
-        try {
-          dc.close();
-        } catch (err) {
-          console.warn("Error closing data channel", err);
-        }
-        stopTracks();
-      };
+      cleanupRef.current = localCleanup;
     } catch (err) {
+      if (
+        abortController.signal.aborted ||
+        attemptId !== connectAttemptRef.current
+      ) {
+        return;
+      }
       console.error(err);
       setConnectionError(
         err instanceof Error ? err.message : "Unable to create Realtime session"
       );
       resetConnection();
+    } finally {
+      if (connectAbortControllerRef.current === abortController) {
+        connectAbortControllerRef.current = null;
+      }
     }
   }, [handleServerEvent, resetConnection, resolvedPromptId, sendSessionUpdate]);
 
   const handleDisconnect = useCallback(() => {
+    connectAbortControllerRef.current?.abort();
+    connectAbortControllerRef.current = null;
+    connectAttemptRef.current += 1;
     cleanupRef.current();
     resetConnection();
   }, [resetConnection]);
@@ -598,9 +654,9 @@ export function RealtimePanel({
                     }`}
                   >
                     <div
-                      className={`max-w-[85%] rounded-2xl px-4 py-3 ${
+                      className={`rounded-2xl px-4 py-3 ${
                         message.role === "user"
-                          ? "bg-rose-100 text-slate-900"
+                          ? "bg-rose-100 text-slate-900 max-w-[85%]"
                           : message.role === "tool"
                           ? "bg-amber-50 border border-amber-200 text-amber-900"
                           : "bg-transparent text-slate-900"
