@@ -1,4 +1,17 @@
-const SERVICE_WORKER_URL = "/service-worker.js";
+import pkg from "../package.json";
+
+declare const __BUILD_ID__: string;
+
+// Build-stable cache buster so Safari refetches the worker on deploys even if
+// the hosting layer caches the script aggressively. Auto-generated per build;
+// no env vars required. Falls back to package version only if the injected
+// build id is missing (should not happen in production bundles).
+const SW_VERSION =
+  (typeof __BUILD_ID__ === "string" ? __BUILD_ID__ : undefined) || pkg.version;
+
+const SERVICE_WORKER_URL = `/service-worker.js?v=${encodeURIComponent(
+  SW_VERSION
+)}`;
 
 export function registerServiceWorker(): void {
   if (import.meta.env.DEV) {
@@ -8,7 +21,7 @@ export function registerServiceWorker(): void {
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
       void navigator.serviceWorker
-        .register(SERVICE_WORKER_URL)
+        .register(SERVICE_WORKER_URL, { updateViaCache: "none" })
         .then((registration) => {
           // Check for updates immediately and periodically
           registration.update();

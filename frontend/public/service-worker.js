@@ -31,7 +31,17 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
+  // Only cache same-origin, non-API GET requests so auth/stateful calls always
+  // hit the network (prevents stale OAuth state for Google sign-in).
   if (event.request.method !== "GET") {
+    return;
+  }
+
+  const url = new URL(event.request.url);
+  const isSameOrigin = url.origin === self.location.origin;
+  const isApiRequest = url.pathname.startsWith("/api/");
+
+  if (!isSameOrigin || isApiRequest) {
     return;
   }
 

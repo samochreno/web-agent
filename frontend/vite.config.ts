@@ -3,6 +3,10 @@ import path from "node:path";
 import react from "@vitejs/plugin-react-swc";
 import { defineConfig, loadEnv, Plugin } from "vite";
 
+// Auto-generate a build id so we don't rely on any env vars; forces a fresh
+// service worker URL every build.
+const buildId = Date.now().toString(36);
+
 // Plugin to inject build timestamp into service worker for cache invalidation
 function serviceWorkerVersionPlugin(): Plugin {
   const buildTimestamp = Date.now().toString();
@@ -30,6 +34,9 @@ export default defineConfig(({ mode }) => {
     // Allow env files to live one level above the frontend directory
     envDir: path.resolve(__dirname, ".."),
     plugins: [react(), serviceWorkerVersionPlugin()],
+    define: {
+      __BUILD_ID__: JSON.stringify(buildId),
+    },
     server: {
       port: 3000,
       host: "0.0.0.0",
