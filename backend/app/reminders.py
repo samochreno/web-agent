@@ -160,8 +160,8 @@ class ReminderService:
         normalized = self._normalize_owner(owner_id)
         if normalized:
             return normalized
-        if session.user and session.user.id:
-            return session.user.id
+        if session.google and session.google.email:
+            return f"google:{session.google.email.strip().lower()}"
         return session_id
 
     @staticmethod

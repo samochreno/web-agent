@@ -81,14 +81,14 @@ export function useCarReminderBridge(enabled: boolean) {
   }, []);
 
   const handleTrigger = useCallback(
-    async (triggerType: "enter_car" | "exit_car") => {
+    async (triggerType: "enter_car" | "exit_car", ownerId?: string) => {
       if (!isNativePlatform() || getPlatform() !== "ios") return;
       const granted = await ensureNotificationPermission();
       if (!granted) return;
       await ensureChannel();
 
       try {
-        const result = await fireReminders(triggerType);
+        const result = await fireReminders(triggerType, ownerId);
         const reminders = result.reminders || [];
         if (!reminders.length) return;
 
@@ -172,8 +172,10 @@ export function useCarReminderBridge(enabled: boolean) {
   useEffect(() => {
     if (!isNativePlatform()) return;
     const globalAny = globalThis as Record<string, unknown>;
-    globalAny.fireReminders = (triggerType: "enter_car" | "exit_car") =>
-      handleTrigger(triggerType);
+    globalAny.fireReminders = (
+      triggerType: "enter_car" | "exit_car",
+      ownerId?: string
+    ) => handleTrigger(triggerType, ownerId);
     return () => {
       delete globalAny.fireReminders;
     };
