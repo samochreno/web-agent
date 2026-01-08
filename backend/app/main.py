@@ -29,7 +29,8 @@ from .google import (
     handle_oauth_callback,
 )
 from .models import SessionData, UserProfile
-from .reminders import ReminderService, serialize_reminder
+from .persistent_reminder_store import PersistentReminderStore
+from .reminders import ReminderService
 from .sessions import SessionStore
 from .tools import ToolExecutor
 
@@ -51,7 +52,8 @@ SESSION_STORE = SessionStore()
 TASKS_SERVICE = GoogleTasksService()
 CALENDAR_SERVICE = GoogleCalendarService()
 VISIBILITY_SERVICE = CalendarVisibilityService(CALENDAR_SERVICE)
-REMINDER_SERVICE = ReminderService(TASKS_SERVICE)
+REMINDER_STORE = PersistentReminderStore()
+REMINDER_SERVICE = ReminderService(TASKS_SERVICE, REMINDER_STORE)
 # Keep state service available for future per-session metadata if needed.
 TOOL_EXECUTOR = ToolExecutor(TASKS_SERVICE, CALENDAR_SERVICE, VISIBILITY_SERVICE, REMINDER_SERVICE)
 NON_GOOGLE_TOOLS = {"get_current_datetime", "web_search", "schedule_trigger_reminder"}
@@ -197,6 +199,7 @@ async def realtime_tool(request: Request) -> JSONResponse:
             arguments,
             connection,
             alias,
+            session_id,
             session,
         )
     except Exception as exc:  # noqa: BLE001
@@ -208,8 +211,8 @@ async def realtime_tool(request: Request) -> JSONResponse:
 @app.get("/api/reminders")
 async def list_reminders(request: Request) -> JSONResponse:
     session_id, session, needs_cookie = ensure_session(request)
-    reminders = [serialize_reminder(reminder) for reminder in session.reminders]
-    return respond({"reminders": reminders}, 200, session_id if needs_cookie else None, needs_cookie)
+    result = await run_in_threadpool(REMINDER_SERVICE.list, session_id, session)
+    return respond(result, 200, session_id if needs_cookie else None, needs_cookie)
 
 
 @app.post("/api/reminders/trigger")
@@ -224,6 +227,7 @@ async def trigger_reminders(request: Request) -> JSONResponse:
     try:
         result = await run_in_threadpool(
             REMINDER_SERVICE.fire,
+            session_id,
             session,
             trigger_type,
             session.google,

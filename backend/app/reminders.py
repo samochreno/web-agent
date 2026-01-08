@@ -1,35 +1,27 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import asdict
-from datetime import datetime
 from typing import Any, Dict, List, Mapping, Optional
 
 from .alias import AliasService
 from .config import timezone
 from .google import GoogleTasksService
 from .models import GoogleConnection, SessionData, TriggerReminder
+from .persistent_reminder_store import PersistentReminderStore
+from .reminder_serialization import serialize_reminder
 from .utils import now
 
 VALID_TRIGGERS = {"enter_car", "exit_car"}
 
 
-def serialize_reminder(reminder: TriggerReminder) -> Dict[str, Any]:
-    payload = asdict(reminder)
-    for key in ("created_at", "fired_at"):
-        value = payload.get(key)
-        if isinstance(value, datetime):
-            payload[key] = value.isoformat()
-    return payload
-
-
 class ReminderService:
-    """Simple in-memory reminder coordinator keyed by the user's session."""
+    """Persistent reminder coordinator keyed by the owning session or user ID."""
 
-    def __init__(self, tasks: GoogleTasksService) -> None:
+    def __init__(self, tasks: GoogleTasksService, store: PersistentReminderStore) -> None:
         self.tasks = tasks
+        self.store = store
 
-    def schedule(self, session: SessionData, arguments: Mapping[str, Any]) -> Dict[str, Any]:
+    def schedule(self, session_id: str, session: SessionData, arguments: Mapping[str, Any]) -> Dict[str, Any]:
         text = self._require_string(arguments.get("text") or arguments.get("title"))
         trigger_type = self._require_trigger(arguments.get("trigger_type") or arguments.get("trigger"))
 
@@ -40,36 +32,29 @@ class ReminderService:
             status="pending",
             created_at=now(),
         )
-        session.reminders.append(reminder)
+        owner = self._owner_key(session_id, session)
+        self.store.append(owner, reminder)
         return {"reminder": serialize_reminder(reminder)}
 
-    def list(self, session: SessionData) -> Dict[str, Any]:
-        reminders = [serialize_reminder(reminder) for reminder in session.reminders]
-        return {"reminders": reminders}
+    def list(self, session_id: str, session: SessionData) -> Dict[str, Any]:
+        owner = self._owner_key(session_id, session)
+        reminders = self.store.all(owner)
+        return {"reminders": [serialize_reminder(reminder) for reminder in reminders]}
 
     def fire(
         self,
+        session_id: str,
         session: SessionData,
         trigger_type: str,
         connection: Optional[GoogleConnection],
         alias: AliasService,
     ) -> Dict[str, Any]:
         normalized_trigger = self._require_trigger(trigger_type)
-        triggered: List[TriggerReminder] = []
-        for reminder in session.reminders:
-            if reminder.trigger_type != normalized_trigger or reminder.status != "pending":
-                continue
-            reminder.status = "fired"
-            reminder.fired_at = now()
-            try:
-                task_id, task_alias, task_list_id = self._create_google_task(connection, session, alias, reminder)
-                reminder.google_task_id = task_id
-                reminder.google_task_alias = task_alias
-                reminder.task_list_id = task_list_id
-                reminder.task_error = None
-            except Exception as exc:  # noqa: BLE001
-                reminder.task_error = str(exc)
-            triggered.append(reminder)
+        owner = self._owner_key(session_id, session)
+        triggered = self.store.mutate(
+            owner,
+            lambda reminders: self._trigger_reminders(reminders, normalized_trigger, connection, session, alias),
+        )
 
         return {
             "trigger_type": normalized_trigger,
@@ -122,6 +107,31 @@ class ReminderService:
             return lists[0]["id"]
         return None
 
+    def _trigger_reminders(
+        self,
+        reminders: List[TriggerReminder],
+        normalized_trigger: str,
+        connection: Optional[GoogleConnection],
+        session: SessionData,
+        alias: AliasService,
+    ) -> List[TriggerReminder]:
+        triggered: List[TriggerReminder] = []
+        for reminder in reminders:
+            if reminder.trigger_type != normalized_trigger or reminder.status != "pending":
+                continue
+            reminder.status = "fired"
+            reminder.fired_at = now()
+            try:
+                task_id, task_alias, task_list_id = self._create_google_task(connection, session, alias, reminder)
+                reminder.google_task_id = task_id
+                reminder.google_task_alias = task_alias
+                reminder.task_list_id = task_list_id
+                reminder.task_error = None
+            except Exception as exc:  # noqa: BLE001
+                reminder.task_error = str(exc)
+            triggered.append(reminder)
+        return triggered
+
     def _require_string(self, value: Any) -> str:
         if isinstance(value, str) and value.strip():
             return value.strip()
@@ -137,3 +147,8 @@ class ReminderService:
             if normalized in VALID_TRIGGERS:
                 return normalized
         raise ValueError(f"Invalid trigger_type. Supported: {', '.join(sorted(VALID_TRIGGERS))}")
+
+    def _owner_key(self, session_id: str, session: SessionData) -> str:
+        if session.user and session.user.id:
+            return session.user.id
+        return session_id

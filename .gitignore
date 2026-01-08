@@ -34,6 +34,7 @@ yarn-error.log*g
 .env*
 !.env.example
 /backend/.env*
+/backend/reminders.json
 /backend/.venv
 
 # typescript

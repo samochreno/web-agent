@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from functools import lru_cache
+from pathlib import Path
 from typing import List
 from zoneinfo import ZoneInfo
 
@@ -120,6 +121,14 @@ def frontend_settings_path() -> str:
     if raw and raw.strip():
         return raw.strip()
     return "#/settings"
+
+
+def reminder_store_path() -> Path:
+    """Resolved path for persisting reminder records."""
+    raw = os.getenv("REMINDER_STORE_PATH")
+    if raw and raw.strip():
+        return Path(raw.strip())
+    return Path(__file__).resolve().parents[2] / "reminders.json"
 
 
 def is_prod() -> bool:

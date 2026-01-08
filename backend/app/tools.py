@@ -102,6 +102,7 @@ class ToolExecutor:
         arguments: Mapping[str, Any],
         connection: Optional[GoogleConnection],
         alias: AliasService,
+        session_id: str,
         session,
     ) -> Dict[str, Any]:
         if name == "get_current_datetime":
@@ -144,7 +145,7 @@ class ToolExecutor:
             case "update_event":
                 return self._update_event(connection, session, alias, arguments)
             case "schedule_trigger_reminder":
-                return self.reminders.schedule(session, arguments)
+                return self.reminders.schedule(session_id, session, arguments)
             case _:
                 return {"error": f"Unknown tool {name}"}
 
