@@ -15,13 +15,19 @@ VALID_TRIGGERS = {"enter_car", "exit_car"}
 
 
 class ReminderService:
-    """Persistent reminder coordinator keyed by the owning session or user ID."""
+    """Persistent reminder coordinator keyed by an explicit owner or session/user fallback."""
 
     def __init__(self, tasks: GoogleTasksService, store: PersistentReminderStore) -> None:
         self.tasks = tasks
         self.store = store
 
-    def schedule(self, session_id: str, session: SessionData, arguments: Mapping[str, Any]) -> Dict[str, Any]:
+    def schedule(
+        self,
+        owner_id: str | None,
+        session_id: str,
+        session: SessionData,
+        arguments: Mapping[str, Any],
+    ) -> Dict[str, Any]:
         text = self._require_string(arguments.get("text") or arguments.get("title"))
         trigger_type = self._require_trigger(arguments.get("trigger_type") or arguments.get("trigger"))
 
@@ -32,17 +38,18 @@ class ReminderService:
             status="pending",
             created_at=now(),
         )
-        owner = self._owner_key(session_id, session)
+        owner = self._owner_key(owner_id, session_id, session)
         self.store.append(owner, reminder)
-        return {"reminder": serialize_reminder(reminder)}
+        return {"owner_id": owner, "reminder": serialize_reminder(reminder)}
 
-    def list(self, session_id: str, session: SessionData) -> Dict[str, Any]:
-        owner = self._owner_key(session_id, session)
+    def list(self, owner_id: str | None, session_id: str, session: SessionData) -> Dict[str, Any]:
+        owner = self._owner_key(owner_id, session_id, session)
         reminders = self.store.all(owner)
-        return {"reminders": [serialize_reminder(reminder) for reminder in reminders]}
+        return {"owner_id": owner, "reminders": [serialize_reminder(reminder) for reminder in reminders]}
 
     def fire(
         self,
+        owner_id: str | None,
         session_id: str,
         session: SessionData,
         trigger_type: str,
@@ -50,7 +57,7 @@ class ReminderService:
         alias: AliasService,
     ) -> Dict[str, Any]:
         normalized_trigger = self._require_trigger(trigger_type)
-        owner = self._owner_key(session_id, session)
+        owner = self._owner_key(owner_id, session_id, session)
         triggered = self.store.mutate(
             owner,
             lambda reminders: self._trigger_reminders(reminders, normalized_trigger, connection, session, alias),
@@ -58,6 +65,7 @@ class ReminderService:
 
         return {
             "trigger_type": normalized_trigger,
+            "owner_id": owner,
             "reminders": [serialize_reminder(item) for item in triggered],
         }
 
@@ -148,7 +156,16 @@ class ReminderService:
                 return normalized
         raise ValueError(f"Invalid trigger_type. Supported: {', '.join(sorted(VALID_TRIGGERS))}")
 
-    def _owner_key(self, session_id: str, session: SessionData) -> str:
+    def _owner_key(self, owner_id: Any, session_id: str, session: SessionData) -> str:
+        normalized = self._normalize_owner(owner_id)
+        if normalized:
+            return normalized
         if session.user and session.user.id:
             return session.user.id
         return session_id
+
+    @staticmethod
+    def _normalize_owner(value: Any) -> str | None:
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        return None

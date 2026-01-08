@@ -167,21 +167,28 @@ export async function callRealtimeTool(
   });
 }
 
-export async function listReminders(): Promise<{ reminders: TriggerReminder[] }> {
-  return fetchJson<{ reminders: TriggerReminder[] }>("/api/reminders");
+export async function listReminders(ownerId?: string): Promise<{ owner_id?: string; reminders: TriggerReminder[] }> {
+  const queryString = ownerId ? `?owner_id=${encodeURIComponent(ownerId)}` : "";
+  return fetchJson<{ owner_id?: string; reminders: TriggerReminder[] }>(`/api/reminders${queryString}`);
 }
 
-export async function fireReminders(triggerType: string): Promise<{
+export async function fireReminders(triggerType: string, ownerId?: string): Promise<{
   trigger_type: string;
+  owner_id?: string;
   reminders: TriggerReminder[];
   error?: string;
 }> {
+  const payload: Record<string, unknown> = { trigger_type: triggerType };
+  if (ownerId) {
+    payload.owner_id = ownerId;
+  }
   return fetchJson<{
     trigger_type: string;
+    owner_id?: string;
     reminders: TriggerReminder[];
     error?: string;
   }>("/api/reminders/trigger", {
     method: "POST",
-    body: JSON.stringify({ trigger_type: triggerType }),
+    body: JSON.stringify(payload),
   });
 }

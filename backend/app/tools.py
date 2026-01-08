@@ -145,7 +145,9 @@ class ToolExecutor:
             case "update_event":
                 return self._update_event(connection, session, alias, arguments)
             case "schedule_trigger_reminder":
-                return self.reminders.schedule(session_id, session, arguments)
+                raw_owner = arguments.get("owner_id")
+                owner_id = raw_owner.strip() if isinstance(raw_owner, str) and raw_owner.strip() else None
+                return self.reminders.schedule(owner_id, session_id, session, arguments)
             case _:
                 return {"error": f"Unknown tool {name}"}
 

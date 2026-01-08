@@ -211,7 +211,8 @@ async def realtime_tool(request: Request) -> JSONResponse:
 @app.get("/api/reminders")
 async def list_reminders(request: Request) -> JSONResponse:
     session_id, session, needs_cookie = ensure_session(request)
-    result = await run_in_threadpool(REMINDER_SERVICE.list, session_id, session)
+    owner_id = read_string(request.query_params.get("owner_id"))
+    result = await run_in_threadpool(REMINDER_SERVICE.list, owner_id, session_id, session)
     return respond(result, 200, session_id if needs_cookie else None, needs_cookie)
 
 
@@ -223,10 +224,12 @@ async def trigger_reminders(request: Request) -> JSONResponse:
     if not trigger_type:
         return respond({"error": "trigger_type is required"}, 400, session_id if needs_cookie else None, needs_cookie)
 
+    owner_id = read_string(body.get("owner_id"))
     alias = AliasService(session.alias_state)
     try:
         result = await run_in_threadpool(
             REMINDER_SERVICE.fire,
+            owner_id,
             session_id,
             session,
             trigger_type,
