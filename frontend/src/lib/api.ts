@@ -134,6 +134,19 @@ export type RealtimeSessionConfig = {
   prompt_id?: string;
 };
 
+export type TriggerReminder = {
+  id: string;
+  text: string;
+  trigger_type: string;
+  status: string;
+  created_at?: string;
+  fired_at?: string | null;
+  google_task_id?: string | null;
+  google_task_alias?: string | null;
+  task_list_id?: string | null;
+  task_error?: string | null;
+};
+
 export async function createRealtimeSession(
   promptId?: string,
   signal?: AbortSignal
@@ -151,5 +164,24 @@ export async function callRealtimeTool(
   return fetchJson<{ result?: unknown; error?: string }>("/api/realtime/tool", {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+}
+
+export async function listReminders(): Promise<{ reminders: TriggerReminder[] }> {
+  return fetchJson<{ reminders: TriggerReminder[] }>("/api/reminders");
+}
+
+export async function fireReminders(triggerType: string): Promise<{
+  trigger_type: string;
+  reminders: TriggerReminder[];
+  error?: string;
+}> {
+  return fetchJson<{
+    trigger_type: string;
+    reminders: TriggerReminder[];
+    error?: string;
+  }>("/api/reminders/trigger", {
+    method: "POST",
+    body: JSON.stringify({ trigger_type: triggerType }),
   });
 }

@@ -20,10 +20,6 @@ dist/
 /frontend/dist/
 /frontend/.vite
 
-# Capacitor native platforms (optional: remove these lines to commit native projects)
-/ios/
-/android/
-
 # misc
 .DS_Store
 *.pem

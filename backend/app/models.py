@@ -38,6 +38,20 @@ class TaskListCache:
 
 
 @dataclass
+class TriggerReminder:
+    id: str
+    text: str
+    trigger_type: str
+    status: str
+    created_at: datetime
+    fired_at: Optional[datetime] = None
+    google_task_id: Optional[str] = None
+    google_task_alias: Optional[str] = None
+    task_list_id: Optional[str] = None
+    task_error: Optional[str] = None
+
+
+@dataclass
 class SessionData:
     user: Optional[UserProfile] = None
     google: Optional[GoogleConnection] = None
@@ -48,3 +62,4 @@ class SessionData:
     task_lists_cache: TaskListCache = field(default_factory=TaskListCache)
     oauth_state: Optional[str] = None
     conversation: List[Dict[str, Any]] = field(default_factory=list)
+    reminders: List[TriggerReminder] = field(default_factory=list)

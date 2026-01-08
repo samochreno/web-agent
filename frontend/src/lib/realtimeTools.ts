@@ -24,6 +24,29 @@ type ToolPropertySchema = {
 export const realtimeTools: RealtimeToolDefinition[] = [
   {
     type: "function",
+    name: "schedule_trigger_reminder",
+    description:
+      "Create a reminder that fires on a specific trigger. Use for car entry/exit: set trigger_type to enter_car or exit_car. The app will notify locally and create a Google Task when it fires.",
+    parameters: {
+      type: "object",
+      required: ["text", "trigger_type"],
+      properties: {
+        text: {
+          type: "string",
+          description: "What to remind the user about when the trigger fires.",
+        },
+        trigger_type: {
+          type: "string",
+          enum: ["enter_car", "exit_car"],
+          description:
+            "Trigger to attach to. enter_car fires when Bluetooth audio connects AND motion is automotive; exit_car when leaving the car.",
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    type: "function",
     name: "list_task_lists",
     description:
       "List Google task lists that the user has connected. Always refer to returned IDs as aliases.",

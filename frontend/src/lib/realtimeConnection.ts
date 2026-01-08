@@ -16,7 +16,7 @@ export type RealtimeConnection = {
 type LegacyGetUserMedia = (
   constraints: MediaStreamConstraints,
   success: (stream: MediaStream) => void,
-  failure: (error: DOMException | MediaStreamError) => void
+  failure: (error: DOMException) => void
 ) => void;
 
 type LegacyNavigator = Navigator & {
@@ -28,7 +28,9 @@ type LegacyNavigator = Navigator & {
 const getMicrophoneStream = async (): Promise<MediaStream> => {
   const mediaDevices = navigator.mediaDevices;
   if (mediaDevices?.getUserMedia) {
-    console.log("RealtimeConnection: requesting microphone stream via navigator.mediaDevices");
+    console.log(
+      "RealtimeConnection: requesting microphone stream via navigator.mediaDevices"
+    );
     return mediaDevices.getUserMedia({
       audio: {
         echoCancellation: true,
@@ -56,7 +58,7 @@ const getMicrophoneStream = async (): Promise<MediaStream> => {
       navigator,
       { audio: true },
       resolve,
-      reject as (err: DOMException | MediaStreamError) => void
+      reject as (err: DOMException) => void
     );
   });
 };
@@ -87,7 +89,9 @@ export async function createRealtimeConnection({
     muted: t.muted,
     settings: t.getSettings(),
   }));
-  console.log("RealtimeConnection: microphone stream tracked", { tracks: trackInfo });
+  console.log("RealtimeConnection: microphone stream tracked", {
+    tracks: trackInfo,
+  });
   if (abortSignal?.aborted) {
     mediaStream.getTracks().forEach((track) => track.stop());
     pc.close();
@@ -117,7 +121,9 @@ export async function createRealtimeConnection({
   );
   try {
     pc.addTrack(microphoneTrack, mediaStream);
-    console.log("RealtimeConnection: microphone track added to RTCPeerConnection");
+    console.log(
+      "RealtimeConnection: microphone track added to RTCPeerConnection"
+    );
   } catch (err) {
     console.error("RealtimeConnection: failed to add microphone track", err);
     throw err;

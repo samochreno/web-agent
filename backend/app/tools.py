@@ -10,6 +10,7 @@ from .alias import AliasService
 from .calendar_visibility import CalendarVisibilityService
 from .config import google_default_duration_minutes, timezone, organization
 from .google import GoogleCalendarService, GoogleConnection, GoogleTasksService
+from .reminders import ReminderService
 from .scheduling import resolve_event_window
 from .utils import parse_date_only, parse_local_datetime
 
@@ -88,10 +89,12 @@ class ToolExecutor:
         tasks: GoogleTasksService,
         calendars: GoogleCalendarService,
         visibility: CalendarVisibilityService,
+        reminders: ReminderService,
     ) -> None:
         self.tasks = tasks
         self.calendars = calendars
         self.visibility = visibility
+        self.reminders = reminders
 
     def execute(
         self,
@@ -140,6 +143,8 @@ class ToolExecutor:
                 return self._create_event(connection, session, alias, arguments)
             case "update_event":
                 return self._update_event(connection, session, alias, arguments)
+            case "schedule_trigger_reminder":
+                return self.reminders.schedule(session, arguments)
             case _:
                 return {"error": f"Unknown tool {name}"}
 

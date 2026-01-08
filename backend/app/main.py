@@ -29,6 +29,7 @@ from .google import (
     handle_oauth_callback,
 )
 from .models import SessionData, UserProfile
+from .reminders import ReminderService, serialize_reminder
 from .sessions import SessionStore
 from .tools import ToolExecutor
 
@@ -50,9 +51,10 @@ SESSION_STORE = SessionStore()
 TASKS_SERVICE = GoogleTasksService()
 CALENDAR_SERVICE = GoogleCalendarService()
 VISIBILITY_SERVICE = CalendarVisibilityService(CALENDAR_SERVICE)
+REMINDER_SERVICE = ReminderService(TASKS_SERVICE)
 # Keep state service available for future per-session metadata if needed.
-TOOL_EXECUTOR = ToolExecutor(TASKS_SERVICE, CALENDAR_SERVICE, VISIBILITY_SERVICE)
-NON_GOOGLE_TOOLS = {"get_current_datetime", "web_search"}
+TOOL_EXECUTOR = ToolExecutor(TASKS_SERVICE, CALENDAR_SERVICE, VISIBILITY_SERVICE, REMINDER_SERVICE)
+NON_GOOGLE_TOOLS = {"get_current_datetime", "web_search", "schedule_trigger_reminder"}
 
 
 @app.get("/health")
@@ -201,6 +203,36 @@ async def realtime_tool(request: Request) -> JSONResponse:
         return respond({"error": str(exc)}, 422, session_id if needs_cookie else None, needs_cookie)
 
     return respond({"result": result}, 200, session_id if needs_cookie else None, needs_cookie)
+
+
+@app.get("/api/reminders")
+async def list_reminders(request: Request) -> JSONResponse:
+    session_id, session, needs_cookie = ensure_session(request)
+    reminders = [serialize_reminder(reminder) for reminder in session.reminders]
+    return respond({"reminders": reminders}, 200, session_id if needs_cookie else None, needs_cookie)
+
+
+@app.post("/api/reminders/trigger")
+async def trigger_reminders(request: Request) -> JSONResponse:
+    session_id, session, needs_cookie = ensure_session(request)
+    body = await read_json_body(request)
+    trigger_type = read_string(body.get("trigger_type"))
+    if not trigger_type:
+        return respond({"error": "trigger_type is required"}, 400, session_id if needs_cookie else None, needs_cookie)
+
+    alias = AliasService(session.alias_state)
+    try:
+        result = await run_in_threadpool(
+            REMINDER_SERVICE.fire,
+            session,
+            trigger_type,
+            session.google,
+            alias,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return respond({"error": str(exc)}, 422, session_id if needs_cookie else None, needs_cookie)
+
+    return respond(result, 200, session_id if needs_cookie else None, needs_cookie)
 
 
 @app.get("/api/calendars")

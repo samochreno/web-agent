@@ -4,6 +4,8 @@ import { Sidebar } from "./components/Sidebar";
 import { ChatPage } from "./pages/ChatPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { getSession } from "./lib/api";
+import { useCarReminderBridge } from "./lib/carReminders";
+import { isNativePlatform } from "./lib/config";
 import {
   emptySessionState,
   type SessionState,
@@ -86,6 +88,8 @@ export default function App() {
   useEffect(() => {
     void refreshSession();
   }, [refreshSession]);
+
+  useCarReminderBridge(isNativePlatform() && !session.loading);
 
   return (
     <main className="flex h-[100dvh] bg-slate-100 overflow-hidden">
