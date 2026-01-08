@@ -28,7 +28,16 @@ type LegacyNavigator = Navigator & {
 const getMicrophoneStream = async (): Promise<MediaStream> => {
   const mediaDevices = navigator.mediaDevices;
   if (mediaDevices?.getUserMedia) {
-    return mediaDevices.getUserMedia({ audio: true });
+    console.log("RealtimeConnection: requesting microphone stream via navigator.mediaDevices");
+    return mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        channelCount: 1,
+        sampleRate: 48000,
+      },
+    });
   }
 
   const legacyNavigator = navigator as LegacyNavigator;
@@ -38,11 +47,10 @@ const getMicrophoneStream = async (): Promise<MediaStream> => {
     legacyNavigator.msGetUserMedia;
 
   if (!legacyGetUserMedia) {
-    throw new Error(
-      "Microphone capture is not supported by this environment."
-    );
+    throw new Error("Microphone capture is not supported by this environment.");
   }
 
+  console.log("RealtimeConnection: falling back to legacy getUserMedia");
   return new Promise<MediaStream>((resolve, reject) => {
     legacyGetUserMedia.call(
       navigator,
@@ -73,6 +81,13 @@ export async function createRealtimeConnection({
   };
 
   const mediaStream = await getMicrophoneStream();
+  const trackInfo = mediaStream.getAudioTracks().map((t) => ({
+    id: t.id,
+    enabled: t.enabled,
+    muted: t.muted,
+    settings: t.getSettings(),
+  }));
+  console.log("RealtimeConnection: microphone stream tracked", { tracks: trackInfo });
   if (abortSignal?.aborted) {
     mediaStream.getTracks().forEach((track) => track.stop());
     pc.close();
@@ -82,7 +97,31 @@ export async function createRealtimeConnection({
   if (!microphoneTrack) {
     throw new Error("Microphone unavailable");
   }
-  pc.addTrack(microphoneTrack);
+  // Reinforce capture settings for WKWebView: keep a single mono track with AGC/NS enabled.
+  try {
+    await microphoneTrack.applyConstraints({
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+      channelCount: 1,
+      sampleRate: 48000,
+    });
+    console.log("RealtimeConnection: applied constraints to microphone track");
+  } catch (err) {
+    console.warn("RealtimeConnection: applyConstraints failed", err);
+  }
+  console.log(
+    "RealtimeConnection: adding microphone track",
+    microphoneTrack.enabled,
+    microphoneTrack.muted
+  );
+  try {
+    pc.addTrack(microphoneTrack, mediaStream);
+    console.log("RealtimeConnection: microphone track added to RTCPeerConnection");
+  } catch (err) {
+    console.error("RealtimeConnection: failed to add microphone track", err);
+    throw err;
+  }
 
   const capabilities = RTCRtpSender.getCapabilities("audio");
   if (capabilities) {
