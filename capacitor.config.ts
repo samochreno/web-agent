@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: "com.example.webagent",
+  appId: "com.samochreno.luna",
   appName: "Luna",
   webDir: "frontend/dist",
   // Server configuration for native builds

@@ -1,4 +1,4 @@
-package com.example.webagent;
+package com.samochreno.luna;
 
 import com.getcapacitor.BridgeActivity;
 
