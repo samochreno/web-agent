@@ -34,26 +34,12 @@ export default function App() {
     if (currentHash !== normalized) {
       window.location.hash = normalized;
     }
-    // Reset connection state when navigating away from chat
-    // The RealtimePanel will be unmounted and its cleanup will disconnect,
-    // but state updates during unmount may not propagate correctly
-    if (normalized !== "/") {
-      setConnectionState("disconnected");
-      setIsOutputAudioBufferActive(false);
-      setConnectionHandlers(null);
-    }
     setRoute(normalized);
   };
 
   useEffect(() => {
     const handler = () => {
       const newRoute = resolveRoute();
-      // Reset connection state when navigating away from chat via browser navigation
-      if (newRoute !== "/") {
-        setConnectionState("disconnected");
-        setIsOutputAudioBufferActive(false);
-        setConnectionHandlers(null);
-      }
       setRoute(newRoute);
     };
     window.addEventListener("hashchange", handler);
@@ -119,16 +105,24 @@ export default function App() {
               {session.error}
             </div>
           ) : null}
-          {isSettings ? (
-            <SettingsPage session={session} refreshSession={refreshSession} />
-          ) : (
-            <ChatPage
-              session={session}
-              onConnectionStateChange={setConnectionState}
-              onOutputAudioBufferActiveChange={setIsOutputAudioBufferActive}
-              onConnectionHandlersReady={setConnectionHandlers}
-            />
-          )}
+          <div className="relative flex-1 min-h-0">
+            <div
+              className={`absolute inset-0 flex flex-col ${isSettings ? "pointer-events-none opacity-0" : ""}`}
+              aria-hidden={isSettings}
+            >
+              <ChatPage
+                session={session}
+                onConnectionStateChange={setConnectionState}
+                onOutputAudioBufferActiveChange={setIsOutputAudioBufferActive}
+                onConnectionHandlersReady={setConnectionHandlers}
+              />
+            </div>
+            {isSettings && (
+              <div className="absolute inset-0 flex flex-col overflow-y-auto">
+                <SettingsPage session={session} refreshSession={refreshSession} />
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </main>
