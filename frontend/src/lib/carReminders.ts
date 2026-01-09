@@ -21,6 +21,11 @@ type CarDetectionPlugin = {
   requestPermissions(): Promise<PermissionStatus>;
   startDetection(options?: { debounceMs?: number }): Promise<void>;
   stopDetection(): Promise<void>;
+  currentStatus(): Promise<{
+    inCar: boolean;
+    motion: string;
+    bluetooth: boolean;
+  }>;
   addListener(
     eventName: "enteredCar" | "exitedCar" | "permissionStatusChanged",
     listenerFunc: (event: CarDetectionEvent) => void
@@ -80,40 +85,57 @@ export function useCarReminderBridge(enabled: boolean) {
     }
   }, []);
 
-  const handleTrigger = useCallback(
-    async (triggerType: "enter_car" | "exit_car", ownerId?: string) => {
-      if (!isNativePlatform() || getPlatform() !== "ios") return;
-      const granted = await ensureNotificationPermission();
-      if (!granted) return;
-      await ensureChannel();
+    const handleTrigger = useCallback(
+      async (triggerType: "enter_car" | "exit_car", ownerId?: string) => {
+        if (!isNativePlatform() || getPlatform() !== "ios") return;
+        const granted = await ensureNotificationPermission();
+        if (!granted) return;
+        await ensureChannel();
 
-      try {
-        const result = await fireReminders(triggerType, ownerId);
-        const reminders = result.reminders || [];
-        if (!reminders.length) return;
-
-        const now = Date.now();
-        const schedulePayload: ScheduleOptions = {
-          notifications: reminders.map((reminder, index) => ({
-            id: notificationId(now, index),
-            title: buildNotificationTitle(triggerType),
-            body: buildNotificationBody(reminder),
-            schedule: { at: new Date(now + 500 + index * 100) },
-            channelId: getPlatform() === "android" ? "car-events" : undefined,
-            extra: {
+        try {
+          const result = await fireReminders(triggerType, ownerId);
+          const reminders = result.reminders || [];
+          const now = Date.now();
+          const notificationsToSchedule: ScheduleOptions["notifications"] = reminders.map(
+            (reminder, index) => ({
+              id: notificationId(now, index),
+              title: buildNotificationTitle(triggerType),
+              body: buildNotificationBody(reminder),
+              schedule: { at: new Date(now + 500 + index * 100) },
+              channelId: getPlatform() === "android" ? "car-events" : undefined,
+              extra: {
               reminderId: reminder.id,
               triggerType,
               googleTaskId:
                 reminder.google_task_alias || reminder.google_task_id,
+              },
+            })
+          );
+
+          notificationsToSchedule.push({
+            id: notificationId(now, reminders.length),
+            title:
+              triggerType === "enter_car"
+                ? "Car detected (enter)"
+                : "Car detected (exit)",
+            body: "Car detection fired (debug fallback)",
+            schedule: { at: new Date(now + 500 + reminders.length * 100) },
+            channelId: getPlatform() === "android" ? "car-events" : undefined,
+            extra: {
+              triggerType,
+              debug: true,
             },
-          })),
-        };
-        await notifications.schedule(schedulePayload);
-      } catch (err) {
-        console.warn("Failed to dispatch car reminder notification", err);
-      }
-    },
-    [ensureChannel]
+          });
+
+          if (!notificationsToSchedule.length) return;
+          await notifications.schedule({
+            notifications: notificationsToSchedule,
+          });
+        } catch (err) {
+          console.warn("Failed to dispatch car reminder notification", err);
+        }
+      },
+      [ensureChannel]
   );
 
   useEffect(() => {

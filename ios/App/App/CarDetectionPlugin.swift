@@ -18,6 +18,7 @@ public class CarDetectionPlugin: CAPPlugin {
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter
     }()
+    private let debugNotificationCenter = UNUserNotificationCenter.current()
 
     @objc public override func load() {
         super.load()
@@ -93,7 +94,13 @@ public class CarDetectionPlugin: CAPPlugin {
         }
         motionManager.startActivityUpdates(to: OperationQueue.main) { [weak self] activity in
             guard let self = self, let activity = activity else { return }
+            let wasAutomotive = self.isAutomotive
             self.isAutomotive = activity.automotive
+            if self.isAutomotive != wasAutomotive {
+                let title = "Automotive Motion"
+                let body = self.isAutomotive ? "Entered automotive state" : "Exited automotive state"
+                self.sendDebugNotification(title: title, body: body)
+            }
             self.evaluateState()
         }
     }
@@ -106,9 +113,18 @@ public class CarDetectionPlugin: CAPPlugin {
     private func updateRouteState() {
         let session = AVAudioSession.sharedInstance()
         let outputs = session.currentRoute.outputs
+        let wasBluetoothRoute = isBluetoothRoute
         isBluetoothRoute = outputs.contains(where: { output in
             output.portType == .bluetoothA2DP || output.portType == .bluetoothHFP
         })
+        if isBluetoothRoute != wasBluetoothRoute {
+            let routeNames = outputs.map { $0.portName }.joined(separator: ", ")
+            let title = "Bluetooth Audio"
+            let body = isBluetoothRoute
+                ? "Connected to \(routeNames.isEmpty ? "Bluetooth audio" : routeNames)"
+                : "Bluetooth audio disconnected"
+            sendDebugNotification(title: title, body: body)
+        }
         evaluateState()
     }
 
@@ -130,6 +146,8 @@ public class CarDetectionPlugin: CAPPlugin {
 
     private func emit(event: String, at date: Date) {
         notifyListeners(event, data: ["timestamp": isoFormatter.string(from: date)])
+        let readableEvent = event == "enteredCar" ? "Entered car" : "Exited car"
+        sendDebugNotification(title: "Car Detection", body: readableEvent)
     }
 
     private func motionStatus() -> String {
@@ -144,6 +162,24 @@ public class CarDetectionPlugin: CAPPlugin {
             return "not_determined"
         @unknown default:
             return "unknown"
+        }
+    }
+
+    private func sendDebugNotification(title: String, body: String) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: nil
+        )
+        debugNotificationCenter.add(request) { error in
+            if let error = error {
+                NSLog("CarDetection debug notification failed: \(error.localizedDescription)")
+            }
         }
     }
 }
