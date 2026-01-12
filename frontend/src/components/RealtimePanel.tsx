@@ -199,19 +199,24 @@ export function RealtimePanel({
   }, []);
 
   const runTool = useCallback(async (call: FunctionCallPayload) => {
+    const outbound = {
+      name: call.name,
+      arguments: call.arguments ?? {},
+    };
     try {
-      const payload = await callRealtimeTool({
-        name: call.name,
-        arguments: call.arguments ?? {},
-      });
+      const payload = await callRealtimeTool(outbound);
       if (payload.result === undefined && !payload.error) {
         console.warn("Realtime tool returned empty result", payload);
       }
-      return payload.result ?? {};
+      return {
+        payload: outbound,
+        response:
+          payload.error !== undefined ? { error: payload.error } : payload.result ?? {},
+      };
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Tool execution failed";
-      return { error: message };
+      return { payload: outbound, response: { error: message } };
     }
   }, []);
 
@@ -672,9 +677,25 @@ export function RealtimePanel({
                             <summary className="cursor-pointer text-xs text-amber-700 hover:text-amber-900">
                               Response
                             </summary>
-                            <pre className="mt-1 max-h-48 overflow-auto rounded bg-amber-100/50 p-2 text-xs text-amber-800">
-                              {JSON.stringify(message.toolResult, null, 2)}
-                            </pre>
+                            <div className="mt-1 space-y-2">
+                              {"payload" in (message.toolResult as any) && (
+                                <pre className="max-h-48 overflow-auto rounded bg-amber-100/50 p-2 text-xs text-amber-800">
+                                  {JSON.stringify(
+                                    (message.toolResult as any)?.payload,
+                                    null,
+                                    2
+                                  )}
+                                </pre>
+                              )}
+                              <pre className="max-h-48 overflow-auto rounded bg-amber-100/50 p-2 text-xs text-amber-800">
+                                {JSON.stringify(
+                                  (message.toolResult as any)?.response ??
+                                    message.toolResult,
+                                  null,
+                                  2
+                                )}
+                              </pre>
+                            </div>
                           </details>
                         )}
                     </div>

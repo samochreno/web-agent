@@ -161,6 +161,8 @@ export async function createRealtimeSession(
 export async function callRealtimeTool(
   payload: { name: string; arguments: unknown }
 ): Promise<{ result?: unknown; error?: string }> {
+  // Log outbound tool payloads to help debug mismatched arguments/aliases.
+  console.debug("[realtime] outbound tool call", payload);
   return fetchJson<{ result?: unknown; error?: string }>("/api/realtime/tool", {
     method: "POST",
     body: JSON.stringify(payload),
