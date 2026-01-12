@@ -7,6 +7,7 @@
     "frontend:build": "npm --prefix frontend install && npm --prefix frontend run build",
     "frontend:lint": "npm --prefix frontend install && npm --prefix frontend run lint",
     "backend": "./backend/scripts/run.sh",
+    "print:tools": "node scripts/print-tools.js",
     "cap:sync": "npm run frontend:build && npx cap sync",
     "cap:ios": "npm run cap:sync && npx cap open ios",
     "cap:android": "npm run cap:sync && npx cap open android",

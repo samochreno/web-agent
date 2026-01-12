@@ -24,6 +24,18 @@ type ToolPropertySchema = {
 export const realtimeTools: RealtimeToolDefinition[] = [
   {
     type: "function",
+    name: "get_current_datetime",
+    description:
+      "Returns the current date, time, weekday, and timezone information.",
+    parameters: {
+      type: "object",
+      properties: {},
+      required: [],
+      additionalProperties: false,
+    },
+  },
+  {
+    type: "function",
     name: "schedule_trigger_reminder",
     description:
       "Create a reminder that fires on a specific trigger. Use for car entry/exit: set trigger_type to enter_car or exit_car. The app will notify locally and create a Google Task when it fires.",
@@ -48,21 +60,20 @@ export const realtimeTools: RealtimeToolDefinition[] = [
   {
     type: "function",
     name: "list_task_lists",
-    description:
-      "List Google task lists that the user has connected. Always refer to returned IDs as aliases.",
+    description: "List Google task lists that the user has connected.",
     parameters: { type: "object", properties: {}, additionalProperties: false },
   },
   {
     type: "function",
     name: "list_tasks",
     description:
-      "List tasks from a specific list, optionally filtered by a start and end date. Use the alias for task_list_id from previous responses.",
+      "List tasks from a specific list, optionally filtered by a start and end date. Use the task_list_id from previous responses.",
     parameters: {
       type: "object",
       properties: {
         task_list_id: {
           type: "string",
-          description: "Alias for the target task list.",
+          description: "ID of the target task list from a previous response.",
         },
         start_date: {
           type: "string",
@@ -82,7 +93,7 @@ export const realtimeTools: RealtimeToolDefinition[] = [
     type: "function",
     name: "create_task",
     description:
-      "Create a new Google task in the specified list (or the default list if none is provided). Do not include raw Google IDs—use alias IDs only.",
+      "Create a new Google task in the specified list (or the default list if none is provided).",
     parameters: {
       type: "object",
       required: ["title"],
@@ -94,7 +105,7 @@ export const realtimeTools: RealtimeToolDefinition[] = [
         },
         task_list_id: {
           type: "string",
-          description: "Alias of the task list to create the task in.",
+          description: "ID of the task list to create the task in.",
         },
         due_date: {
           type: "string",
@@ -108,18 +119,18 @@ export const realtimeTools: RealtimeToolDefinition[] = [
     type: "function",
     name: "update_task",
     description:
-      "Update a Google task using the alias IDs provided earlier. Only send fields that need to change.",
+      "Update a Google task. Only send fields that need to change. To mark a task done you MUST set status to completed; omitting status keeps the current value.",
     parameters: {
       type: "object",
       required: ["task_id"],
       properties: {
         task_id: {
           type: "string",
-          description: "Alias for the task to update.",
+          description: "ID for the task to update from a previous response.",
         },
         task_list_id: {
           type: "string",
-          description: "Alias for the task list that contains the task.",
+          description: "ID for the task list that contains the task.",
         },
         title: { type: "string", description: "Updated task title." },
         notes: { type: "string", description: "Updated notes or description." },
@@ -127,6 +138,12 @@ export const realtimeTools: RealtimeToolDefinition[] = [
           type: "string",
           description:
             "Optional updated due date in YYYY-MM-DD format. Omit to leave unchanged; send empty string to clear.",
+        },
+        status: {
+          type: "string",
+          enum: ["needsAction", "completed"],
+          description:
+            "Use completed to mark the task done; leaving this out keeps the current status.",
         },
       },
       additionalProperties: false,
@@ -136,7 +153,7 @@ export const realtimeTools: RealtimeToolDefinition[] = [
     type: "function",
     name: "list_events",
     description:
-      "List calendar events across the user's allowed calendars. You must provide a start_date and end_date range in ISO format (YYYY-MM-DD). Returned IDs are aliases.",
+      "List calendar events across the user's calendars. You must provide a start_date and end_date range in ISO format (YYYY-MM-DD).",
     parameters: {
       type: "object",
       required: ["start_date", "end_date"],
@@ -198,14 +215,14 @@ export const realtimeTools: RealtimeToolDefinition[] = [
     type: "function",
     name: "update_event",
     description:
-      "Update a calendar event using its alias event_id. Events from readonly calendars will be rejected by the server.",
+      "Update a calendar event. Events from readonly calendars will be rejected by the server.",
     parameters: {
       type: "object",
       required: ["event_id"],
       properties: {
         event_id: {
           type: "string",
-          description: "Alias for the event to update.",
+          description: "ID for the event to update from a previous response.",
         },
         title: { type: "string", description: "Updated event title." },
         notes: { type: "string", description: "Updated description." },
