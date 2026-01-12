@@ -194,8 +194,14 @@ class GoogleTasksService:
     def list_task_lists(self, connection: GoogleConnection, session: SessionData) -> List[Dict[str, Any]]:
         modules = _google_modules()
         service = modules.build("tasks", "v1", credentials=credentials_for(connection, session), cache_discovery=False)
-        response = service.tasklists().list().execute()
-        items = response.get("items") or []
+        items: List[Dict[str, Any]] = []
+        page_token: str | None = None
+        while True:
+            response = service.tasklists().list(pageToken=page_token, maxResults=100).execute()
+            items.extend(response.get("items") or [])
+            page_token = response.get("nextPageToken")
+            if not page_token:
+                break
         return [{"id": item.get("id"), "title": item.get("title"), "name": item.get("title")} for item in items]
 
     def cached_task_lists(self, session: SessionData) -> List[Dict[str, Any]]:
@@ -222,9 +228,27 @@ class GoogleTasksService:
     ) -> List[Dict[str, Any]]:
         modules = _google_modules()
         service = modules.build("tasks", "v1", credentials=credentials_for(connection, session), cache_discovery=False)
-        response = service.tasks().list(tasklist=task_list_id, showCompleted=True, showHidden=False).execute()
         timezone = config.timezone()
-        tasks = [map_task(item, timezone) for item in response.get("items") or []]
+        tasks: List[Dict[str, Any]] = []
+        page_token: str | None = None
+
+        while True:
+            response = (
+                service.tasks()
+                .list(
+                    tasklist=task_list_id,
+                    showCompleted=True,
+                    showHidden=False,
+                    maxResults=100,
+                    pageToken=page_token,
+                )
+                .execute()
+            )
+            tasks.extend(map_task(item, timezone) for item in response.get("items") or [])
+            page_token = response.get("nextPageToken")
+            if not page_token:
+                break
+
         if not start or not end:
             return tasks
 
