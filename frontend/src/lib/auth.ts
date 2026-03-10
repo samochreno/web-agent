@@ -63,24 +63,24 @@ export function listenForOAuthCallback(
 
   const handler = async (event: URLOpenListenerEvent) => {
     const url = new URL(event.url);
+    const callbackPath = [url.hostname, url.pathname.replace(/^\/+/, "")]
+      .filter(Boolean)
+      .join("/");
 
-    // Check if this is an OAuth callback from our custom scheme
-    // URL format: luna://oauth/callback?success=true
-    if (url.protocol === `${APP_URL_SCHEME}:` && url.pathname.includes("oauth/callback")) {
-      // Close the browser
+    // Custom-scheme URLs like luna://oauth/callback parse "oauth" as the host on iOS.
+    if (
+      url.protocol === `${APP_URL_SCHEME}:` &&
+      callbackPath === "oauth/callback"
+    ) {
       await Browser.close();
-
-      // Check if OAuth was successful
-      const success = url.searchParams.get("success") === "true";
-      callback(success);
+      callback(url.searchParams.get("success") === "true");
     }
   };
 
-  // Add listener
-  void App.addListener("appUrlOpen", handler);
+  const listenerPromise = App.addListener("appUrlOpen", handler);
 
   // Return cleanup function
   return () => {
-    void App.removeAllListeners();
+    void listenerPromise.then((listener) => listener.remove());
   };
 }

@@ -14,15 +14,17 @@ What happens:
 
 - `npm run dev` runs the backend via `backend/scripts/run.sh` (FastAPI +
   uvicorn) and the frontend via `npm --prefix frontend run dev`.
-- The backend exposes `/api/realtime/session`, exchanging your published prompt
-  id and `OPENAI_API_KEY` for a Realtime client secret and websocket URL. The
+- The backend exposes `/api/realtime/session`, exchanging the frontend's
+  checked-in Realtime instructions and `OPENAI_API_KEY` for a Realtime client
+  secret and websocket URL. The
   Vite dev server proxies `/api/*` to `127.0.0.1:8000`.
 
 ## Required environment
 
 - `OPENAI_API_KEY`
-- `VITE_REALTIME_PROMPT_ID` (or `REALTIME_PROMPT_ID`)
 - (optional) `REALTIME_API_BASE` or `VITE_REALTIME_API_BASE` (defaults to `https://api.openai.com`)
+- (optional) `REALTIME_MODEL` or `VITE_REALTIME_MODEL` (defaults to `gpt-realtime-1.5`)
+- (optional) `REALTIME_VOICE` or `VITE_REALTIME_VOICE` (defaults to `alloy`)
 - (optional) `VITE_API_URL` (override the dev proxy target for `/api`)
 - (optional) `APP_TIMEZONE` to control task/event parsing (defaults to UTC)
 
@@ -36,10 +38,9 @@ The FastAPI backend mirrors the legacy app’s tool server and calendar controls
 
 Tool calls mask Google IDs with numeric aliases (tasks, task lists, calendars, events) so the model never sees raw Google identifiers. Shared calendars are tagged `readonly` and enforced in `update_event`. Event defaults (start time + duration) follow `GOOGLE_EVENT_START_TIME` and `GOOGLE_EVENT_DURATION_MINUTES`.
 
-Set the env vars in your shell (or process manager) before running. Use a
-published prompt id (starts with `pmpt_...`) and an API key from the same
-project and organization. The published prompt controls the effective Realtime
-model, so its configured model must match the session you want to run.
+Set the env vars in your shell (or process manager) before running. The
+Realtime instructions now live in `frontend/src/lib/realtimeInstructions.ts`,
+so they are versioned in git.
 
 ## Customize
 
@@ -71,7 +72,7 @@ model, so its configured model must match the session you want to run.
 
 1. Push changes to `main`; the workflow rebuilds the frontend, updates `backend/frontend_dist.tar.gz`, and keeps `backend/requirements.txt` in sync.
 2. Let App Platform install `requirements.txt` and run `./backend/scripts/run.sh` (it already pulls the latest tarball and extracts it).
-3. Ensure required env vars (`OPENAI_API_KEY`, `VITE_REALTIME_PROMPT_ID`, Google credentials, etc.) remain defined for the backend service.
+3. Ensure required env vars (`OPENAI_API_KEY`, Google credentials, etc.) remain defined for the backend service.
 
 ## Mobile (Capacitor)
 

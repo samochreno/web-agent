@@ -59,7 +59,6 @@ export default function App() {
           email: null,
           expires_at: null,
         },
-        prompt: next.prompt,
         realtime: next.realtime,
       });
     } catch (err) {

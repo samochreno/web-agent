@@ -1,4 +1,4 @@
-import type { GoogleStatus, PromptInfo, UserProfile } from "./lib/api";
+import type { GoogleStatus, UserProfile } from "./lib/api";
 
 export type ConnectionState = "disconnected" | "connecting" | "connected";
 
@@ -7,7 +7,6 @@ export type SessionState = {
   error?: string | null;
   user: UserProfile | null;
   google: GoogleStatus;
-  prompt?: PromptInfo;
   realtime?: { model?: string | null; voice?: string | null };
 };
 
@@ -16,6 +15,5 @@ export const emptySessionState: SessionState = {
   error: null,
   user: null,
   google: { connected: false, email: null, expires_at: null },
-  prompt: {},
   realtime: {},
 };

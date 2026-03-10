@@ -2,6 +2,7 @@ import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createRealtimeConnection } from "../lib/realtimeConnection";
 import { callRealtimeTool, createRealtimeSession } from "../lib/api";
+import { realtimeInstructions } from "../lib/realtimeInstructions";
 import { realtimeTools } from "../lib/realtimeTools";
 import type { ConnectionState } from "../types";
 
@@ -27,7 +28,8 @@ type ConversationMessage = {
 
 type Props = {
   className?: string;
-  promptId?: string;
+  model?: string;
+  voice?: string;
   onConnectionStateChange?: (state: ConnectionState) => void;
   onOutputAudioBufferActiveChange?: (active: boolean) => void;
   onConnectionHandlersReady?: (handlers: {
@@ -82,7 +84,8 @@ function deriveApiBase(urlFromSession?: string | null): string {
 
 export function RealtimePanel({
   className,
-  promptId,
+  model,
+  voice,
   onConnectionStateChange,
   onOutputAudioBufferActiveChange,
   onConnectionHandlersReady,
@@ -122,8 +125,6 @@ export function RealtimePanel({
     },
     [onOutputAudioBufferActiveChange]
   );
-
-  const resolvedPromptId = promptId;
 
   const shouldAutoConnect = import.meta.env.PROD;
 
@@ -404,12 +405,17 @@ export function RealtimePanel({
 
     const session: Record<string, unknown> = {
       modalities: ["text", "audio"],
+      instructions: realtimeInstructions,
       input_audio_transcription: { model: "gpt-4o-transcribe", language: "en" },
       tools: realtimeTools,
     };
 
-    if (resolvedPromptId) {
-      session.prompt = { id: resolvedPromptId };
+    if (model) {
+      session.model = model;
+    }
+
+    if (voice) {
+      session.voice = voice;
     }
 
     try {
@@ -419,14 +425,9 @@ export function RealtimePanel({
         err instanceof Error ? err.message : "Unable to update session"
       );
     }
-  }, [resolvedPromptId, sendClientEvent]);
+  }, [model, sendClientEvent, voice]);
 
   const handleConnect = useCallback(async () => {
-    if (!resolvedPromptId) {
-      setConnectionError("Prompt ID is not configured");
-      return;
-    }
-
     const attemptId = connectAttemptRef.current + 1;
     connectAttemptRef.current = attemptId;
 
@@ -439,7 +440,7 @@ export function RealtimePanel({
 
     try {
       const ephemeral = await createRealtimeSession(
-        resolvedPromptId,
+        realtimeInstructions,
         abortController.signal
       );
       if (
@@ -553,7 +554,7 @@ export function RealtimePanel({
         connectAbortControllerRef.current = null;
       }
     }
-  }, [handleServerEvent, resetConnection, resolvedPromptId, sendSessionUpdate]);
+  }, [handleServerEvent, resetConnection, sendSessionUpdate]);
 
   const handleDisconnect = useCallback(() => {
     connectAbortControllerRef.current?.abort();
@@ -587,17 +588,16 @@ export function RealtimePanel({
     if (connectionState === CONNECTION_STATES.CONNECTED) {
       sendSessionUpdate();
     }
-  }, [connectionState, resolvedPromptId, sendSessionUpdate]);
+  }, [connectionState, sendSessionUpdate]);
 
   useEffect(() => {
     if (hasAutoConnectedRef.current) return;
     if (connectionState !== CONNECTION_STATES.DISCONNECTED) return;
-    if (!resolvedPromptId) return;
     if (!shouldAutoConnect) return;
 
     hasAutoConnectedRef.current = true;
     void handleConnect();
-  }, [connectionState, handleConnect, resolvedPromptId, shouldAutoConnect]);
+  }, [connectionState, handleConnect, shouldAutoConnect]);
 
   // Expose connection handlers to parent
   useEffect(() => {

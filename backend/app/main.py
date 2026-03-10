@@ -67,13 +67,11 @@ async def health() -> Mapping[str, str]:
 @app.get("/api/auth/session")
 async def auth_session(request: Request) -> JSONResponse:
     session_id, session, needs_cookie = ensure_session(request)
-    prompt_id = config.realtime_prompt_id()
     payload = {
         "user": serialize_user(session.user),
         "google": serialize_google(session),
-        "prompt": {"id": prompt_id},
         "realtime": {
-            "model": None if prompt_id else config.realtime_model(),
+            "model": config.realtime_model(),
             "voice": config.realtime_voice(),
         },
     }
@@ -105,21 +103,22 @@ async def logout(request: Request) -> JSONResponse:
 
 @app.post("/api/realtime/session")
 async def create_realtime_session(request: Request) -> JSONResponse:
-    """Exchange a prompt id for a Realtime client secret and websocket URL."""
+    """Exchange client instructions for a Realtime client secret and websocket URL."""
     api_key = read_string(os.getenv("OPENAI_API_KEY"))
     if not api_key:
         return respond({"error": "Missing OPENAI_API_KEY environment variable"}, 500)
 
     session_id, session, needs_cookie = ensure_session(request)
     body = await read_json_body(request)
-    prompt_id = resolve_prompt_id(body)
-    if not prompt_id:
-        return respond({"error": "Missing prompt id"}, 400, session_id if needs_cookie else None, needs_cookie)
+    instructions = resolve_instructions(body)
+    if not instructions:
+        return respond({"error": "Missing instructions"}, 400, session_id if needs_cookie else None, needs_cookie)
 
     api_base = config.realtime_api_base().rstrip("/")
     payload = {
         "modalities": ["text", "audio"],
-        "prompt": {"id": prompt_id},
+        "instructions": instructions,
+        "model": config.realtime_model(),
         "voice": config.realtime_voice(),
         "input_audio_transcription": {"model": "whisper-1"},
     }
@@ -167,9 +166,8 @@ async def create_realtime_session(request: Request) -> JSONResponse:
             "client_secret": client_secret,
             "expires_after": expires_after,
             "url": ws_url,
-            "model": None,
+            "model": config.realtime_model(),
             "voice": config.realtime_voice(),
-            "prompt_id": prompt_id,
         },
         200,
         session_id if needs_cookie else None,
@@ -451,17 +449,10 @@ async def read_json_body(request: Request) -> Mapping[str, Any]:
     return parsed if isinstance(parsed, Mapping) else {}
 
 
-def resolve_prompt_id(body: Mapping[str, Any]) -> str | None:
-    prompt = body.get("prompt", {})
-    prompt_id = None
-    if isinstance(prompt, Mapping):
-        prompt_id = prompt.get("id")
-    prompt_id = prompt_id or body.get("prompt_id") or body.get("promptId")
-    env_prompt = config.realtime_prompt_id()
-    if not prompt_id and env_prompt:
-        prompt_id = env_prompt
-    if prompt_id and isinstance(prompt_id, str) and prompt_id.strip():
-        return prompt_id.strip()
+def resolve_instructions(body: Mapping[str, Any]) -> str | None:
+    instructions = body.get("instructions") or body.get("instruction")
+    if instructions and isinstance(instructions, str) and instructions.strip():
+        return instructions.strip()
     return None
 
 

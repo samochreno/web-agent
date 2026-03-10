@@ -30,13 +30,6 @@ def realtime_api_base() -> str:
     )
 
 
-def realtime_prompt_id() -> str | None:
-    env_value = os.getenv("REALTIME_PROMPT_ID") or os.getenv("VITE_REALTIME_PROMPT_ID")
-    if env_value and env_value.strip():
-        return env_value.strip()
-    return None
-
-
 def realtime_model() -> str:
     raw = os.getenv("REALTIME_MODEL") or os.getenv("VITE_REALTIME_MODEL")
     if raw and raw.strip():

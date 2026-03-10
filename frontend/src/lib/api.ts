@@ -43,12 +43,10 @@ export type GoogleStatus = {
   email?: string | null;
   expires_at?: string | null;
 };
-export type PromptInfo = { id?: string | null };
 
 export type SessionResponse = {
   user?: UserProfile | null;
   google?: GoogleStatus;
-  prompt?: PromptInfo;
   realtime?: { model?: string | null; voice?: string | null };
 };
 
@@ -131,7 +129,6 @@ export type RealtimeSessionConfig = {
   expires_after?: number | null;
   model?: string;
   voice?: string;
-  prompt_id?: string;
 };
 
 export type TriggerReminder = {
@@ -148,12 +145,12 @@ export type TriggerReminder = {
 };
 
 export async function createRealtimeSession(
-  promptId?: string,
+  instructions?: string,
   signal?: AbortSignal
 ): Promise<RealtimeSessionConfig> {
   return fetchJson<RealtimeSessionConfig>("/api/realtime/session", {
     method: "POST",
-    body: JSON.stringify(promptId ? { prompt: { id: promptId } } : {}),
+    body: JSON.stringify(instructions ? { instructions } : {}),
     signal,
   });
 }
