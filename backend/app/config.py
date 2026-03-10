@@ -41,7 +41,7 @@ def realtime_model() -> str:
     raw = os.getenv("REALTIME_MODEL") or os.getenv("VITE_REALTIME_MODEL")
     if raw and raw.strip():
         return raw.strip()
-    return "gpt-4o-realtime-preview-2025-06-03"
+    return "gpt-realtime-1.5"
 
 
 def realtime_voice() -> str:

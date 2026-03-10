@@ -404,7 +404,7 @@ export function RealtimePanel({
 
     const session: Record<string, unknown> = {
       modalities: ["text", "audio"],
-      input_audio_transcription: { model: "gpt-4o-transcribe", language: "sk" },
+      input_audio_transcription: { model: "gpt-4o-transcribe", language: "en" },
       tools: realtimeTools,
     };
 

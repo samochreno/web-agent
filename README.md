@@ -38,7 +38,8 @@ Tool calls mask Google IDs with numeric aliases (tasks, task lists, calendars, e
 
 Set the env vars in your shell (or process manager) before running. Use a
 published prompt id (starts with `pmpt_...`) and an API key from the same
-project and organization.
+project and organization. The published prompt controls the effective Realtime
+model, so its configured model must match the session you want to run.
 
 ## Customize
 

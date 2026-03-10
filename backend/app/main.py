@@ -67,10 +67,15 @@ async def health() -> Mapping[str, str]:
 @app.get("/api/auth/session")
 async def auth_session(request: Request) -> JSONResponse:
     session_id, session, needs_cookie = ensure_session(request)
+    prompt_id = config.realtime_prompt_id()
     payload = {
         "user": serialize_user(session.user),
         "google": serialize_google(session),
-        "prompt": {"id": config.realtime_prompt_id()},
+        "prompt": {"id": prompt_id},
+        "realtime": {
+            "model": None if prompt_id else config.realtime_model(),
+            "voice": config.realtime_voice(),
+        },
     }
     return respond(payload, 200, session_id if needs_cookie else None, needs_cookie)
 
@@ -115,6 +120,7 @@ async def create_realtime_session(request: Request) -> JSONResponse:
     payload = {
         "modalities": ["text", "audio"],
         "prompt": {"id": prompt_id},
+        "voice": config.realtime_voice(),
         "input_audio_transcription": {"model": "whisper-1"},
     }
 
@@ -161,6 +167,8 @@ async def create_realtime_session(request: Request) -> JSONResponse:
             "client_secret": client_secret,
             "expires_after": expires_after,
             "url": ws_url,
+            "model": None,
+            "voice": config.realtime_voice(),
             "prompt_id": prompt_id,
         },
         200,
