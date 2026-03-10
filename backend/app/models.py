@@ -61,5 +61,6 @@ class SessionData:
     calendar_cache: CalendarCache = field(default_factory=CalendarCache)
     task_lists_cache: TaskListCache = field(default_factory=TaskListCache)
     oauth_state: Optional[str] = None
+    oauth_code_verifier: Optional[str] = None
     conversation: List[Dict[str, Any]] = field(default_factory=list)
     reminders: List[TriggerReminder] = field(default_factory=list)

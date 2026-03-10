@@ -57,7 +57,11 @@ def ensure_google_configured() -> None:
         raise GoogleNotConfigured("Google OAuth is not configured.")
 
 
-def build_flow(state: str, redirect_uri: str | None = None) -> Flow:
+def build_flow(
+    state: str,
+    redirect_uri: str | None = None,
+    code_verifier: str | None = None,
+) -> Flow:
     ensure_google_configured()
     Flow = _google_modules().flow
     callback = config.google_redirect_uri(redirect_uri)
@@ -74,6 +78,7 @@ def build_flow(state: str, redirect_uri: str | None = None) -> Flow:
         scopes=config.google_scopes(),
         redirect_uri=callback,
         state=state,
+        code_verifier=code_verifier,
     )
 
 
@@ -87,6 +92,7 @@ def authorization_url(session: SessionData, redirect_uri: str | None = None) -> 
         include_granted_scopes="true",
         prompt="consent",
     )
+    session.oauth_code_verifier = flow.code_verifier
     return auth_url, state
 
 
@@ -100,7 +106,7 @@ def handle_oauth_callback(
     if session.oauth_state and session.oauth_state != state:
         raise ValueError("Invalid OAuth state")
 
-    flow = build_flow(state, redirect_uri)
+    flow = build_flow(state, redirect_uri, code_verifier=session.oauth_code_verifier)
     flow.fetch_token(code=code)
     creds = flow.credentials
     email = _lookup_email(creds)
@@ -116,6 +122,7 @@ def handle_oauth_callback(
     )
     session.google = connection
     session.oauth_state = None
+    session.oauth_code_verifier = None
     session.calendar_cache = CalendarCache()
     session.task_lists_cache = TaskListCache()
     return connection
@@ -126,6 +133,7 @@ def disconnect(session: SessionData) -> None:
     session.calendar_cache = CalendarCache()
     session.task_lists_cache = TaskListCache()
     session.oauth_state = None
+    session.oauth_code_verifier = None
 
 
 def _lookup_email(credentials: Credentials) -> str | None:

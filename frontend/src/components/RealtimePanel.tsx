@@ -173,6 +173,15 @@ function detectLanguage(text: string): SupportedLanguage | null {
   return skScore > enScore ? "sk" : "en";
 }
 
+function isMeaningfulUserInput(text: string): boolean {
+  const normalized = text.trim();
+  if (!normalized) {
+    return false;
+  }
+  // Ignore turns that are only punctuation/symbol noise, e.g. ".", "...", "??".
+  return !/^[\p{P}\p{S}\s]+$/u.test(normalized);
+}
+
 function deriveApiBase(urlFromSession?: string | null): string {
   if (!urlFromSession) return DEFAULT_API_BASE;
   try {
@@ -296,6 +305,10 @@ export function RealtimePanel({
     setMessages((prev) =>
       prev.map((m) => (m.id === id ? { ...m, status: "done" } : m))
     );
+  }, []);
+
+  const removeMessage = useCallback((id: string) => {
+    setMessages((prev) => prev.filter((m) => m.id !== id));
   }, []);
 
   const resetConnection = useCallback(() => {
@@ -439,13 +452,26 @@ export function RealtimePanel({
           if (id) {
             const finalText =
               raw.transcript && raw.transcript !== "\n"
-                ? raw.transcript
-                : "[inaudible]";
+                ? raw.transcript.trim()
+                : "";
+            if (!isMeaningfulUserInput(finalText)) {
+              removeMessage(id);
+              return;
+            }
             const detectedLanguage = detectLanguage(finalText);
             if (detectedLanguage) {
               updateLastUsedLanguage(detectedLanguage);
             }
             addOrUpdateMessage(id, "user", finalText, "done");
+            try {
+              sendClientEvent({ type: "response.create" });
+            } catch (err) {
+              setConnectionError(
+                err instanceof Error
+                  ? err.message
+                  : "Unable to create voice response"
+              );
+            }
           }
           return;
         }
@@ -495,6 +521,8 @@ export function RealtimePanel({
       appendAssistantText,
       handleFunctionCall,
       markMessageDone,
+      removeMessage,
+      sendClientEvent,
       updateLastUsedLanguage,
     ]
   );
@@ -506,6 +534,14 @@ export function RealtimePanel({
       modalities: ["text", "audio"],
       instructions: buildRealtimeInstructions(lastUsedLanguageRef.current),
       input_audio_transcription: { model: "gpt-4o-transcribe" },
+      turn_detection: {
+        type: "server_vad",
+        threshold: 0.7,
+        prefix_padding_ms: 500,
+        silence_duration_ms: 1500,
+        interrupt_response: true,
+        create_response: false,
+      },
       tools: realtimeTools,
     };
 
@@ -529,9 +565,12 @@ export function RealtimePanel({
   const handleTextSubmit = useCallback(
     (event?: React.FormEvent) => {
       event?.preventDefault();
-      if (!inputText.trim()) return;
+      const text = inputText.trim();
+      if (!isMeaningfulUserInput(text)) {
+        setInputText("");
+        return;
+      }
       try {
-        const text = inputText.trim();
         const detectedLanguage = detectLanguage(text);
         if (detectedLanguage) {
           updateLastUsedLanguage(detectedLanguage);
