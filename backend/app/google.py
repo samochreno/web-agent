@@ -79,6 +79,9 @@ def build_flow(
         redirect_uri=callback,
         state=state,
         code_verifier=code_verifier,
+        # google-auth-oauthlib's from_client_config passes this through as None
+        # unless explicitly provided, which disables PKCE autogeneration.
+        autogenerate_code_verifier=code_verifier is None,
     )
 
 
@@ -103,8 +106,10 @@ def handle_oauth_callback(
     redirect_uri: str | None = None,
 ) -> GoogleConnection:
     ensure_google_configured()
-    if session.oauth_state and session.oauth_state != state:
+    if not session.oauth_state or session.oauth_state != state:
         raise ValueError("Invalid OAuth state")
+    if not session.oauth_code_verifier:
+        raise ValueError("Missing OAuth code verifier. Please restart Google connect.")
 
     flow = build_flow(state, redirect_uri, code_verifier=session.oauth_code_verifier)
     flow.fetch_token(code=code)
