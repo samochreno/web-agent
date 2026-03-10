@@ -2,13 +2,80 @@ import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createRealtimeConnection } from "../lib/realtimeConnection";
 import { callRealtimeTool, createRealtimeSession } from "../lib/api";
-import { realtimeInstructions } from "../lib/realtimeInstructions";
+import {
+  buildRealtimeInstructions,
+  type SupportedLanguage,
+} from "../lib/realtimeInstructions";
 import { realtimeTools } from "../lib/realtimeTools";
 import type { ConnectionState } from "../types";
 
 const DEFAULT_API_BASE =
   (import.meta.env.VITE_REALTIME_API_BASE as string | undefined) ||
   "https://api.openai.com";
+const LAST_USED_LANGUAGE_KEY = "last_used_language";
+
+const SLOVAK_DIACRITICS_RE = /[áäčďéíĺľňóôŕšťúýž]/i;
+const SLOVAK_WORDS = new Set([
+  "a",
+  "ahoj",
+  "ako",
+  "auto",
+  "budem",
+  "chcem",
+  "co",
+  "čo",
+  "dakujem",
+  "ďakujem",
+  "dnes",
+  "este",
+  "ešte",
+  "idem",
+  "kde",
+  "kedy",
+  "mam",
+  "mám",
+  "mas",
+  "máš",
+  "na",
+  "nech",
+  "pripomen",
+  "pripomeň",
+  "prosim",
+  "prosím",
+  "skola",
+  "škola",
+  "tasky",
+  "teraz",
+  "uloha",
+  "úloha",
+  "umyť",
+  "umyt",
+  "zajtra",
+]);
+const ENGLISH_WORDS = new Set([
+  "and",
+  "back",
+  "calendar",
+  "class",
+  "do",
+  "event",
+  "have",
+  "hello",
+  "i",
+  "my",
+  "next",
+  "please",
+  "remind",
+  "schedule",
+  "school",
+  "task",
+  "the",
+  "time",
+  "today",
+  "tomorrow",
+  "what",
+  "when",
+]);
 
 const CONNECTION_STATES = {
   DISCONNECTED: "disconnected",
@@ -67,6 +134,45 @@ type FunctionCallPayload = {
   arguments: unknown;
 };
 
+function readStoredLanguage(): SupportedLanguage {
+  if (typeof window === "undefined") {
+    return "en";
+  }
+
+  const stored = window.localStorage.getItem(LAST_USED_LANGUAGE_KEY);
+  return stored === "sk" || stored === "en" ? stored : "en";
+}
+
+function detectLanguage(text: string): SupportedLanguage | null {
+  const normalized = text.trim().toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+
+  let skScore = 0;
+  let enScore = 0;
+
+  if (SLOVAK_DIACRITICS_RE.test(normalized)) {
+    skScore += 3;
+  }
+
+  const tokens = normalized.match(/[a-zA-ZÀ-ž']+/g) ?? [];
+  for (const token of tokens) {
+    if (SLOVAK_WORDS.has(token)) {
+      skScore += 2;
+    }
+    if (ENGLISH_WORDS.has(token)) {
+      enScore += 2;
+    }
+  }
+
+  if (skScore === enScore) {
+    return null;
+  }
+
+  return skScore > enScore ? "sk" : "en";
+}
+
 function deriveApiBase(urlFromSession?: string | null): string {
   if (!urlFromSession) return DEFAULT_API_BASE;
   try {
@@ -97,6 +203,7 @@ export function RealtimePanel({
   const connectAttemptRef = useRef(0);
   const connectAbortControllerRef = useRef<AbortController | null>(null);
   const hasAutoConnectedRef = useRef(false);
+  const lastUsedLanguageRef = useRef<SupportedLanguage>(readStoredLanguage());
 
   const [connectionState, setConnectionStateInternal] =
     useState<ConnectionState>(CONNECTION_STATES.DISCONNECTED);
@@ -108,6 +215,9 @@ export function RealtimePanel({
   ] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [inputText, setInputText] = useState("");
+  const [lastUsedLanguage, setLastUsedLanguage] = useState<SupportedLanguage>(
+    lastUsedLanguageRef.current
+  );
 
   // Wrapper to sync state with parent
   const setConnectionState = useCallback(
@@ -127,6 +237,14 @@ export function RealtimePanel({
   );
 
   const shouldAutoConnect = import.meta.env.PROD;
+
+  const updateLastUsedLanguage = useCallback((language: SupportedLanguage) => {
+    lastUsedLanguageRef.current = language;
+    setLastUsedLanguage(language);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(LAST_USED_LANGUAGE_KEY, language);
+    }
+  }, []);
 
   const addOrUpdateMessage = useCallback(
     (
@@ -323,6 +441,10 @@ export function RealtimePanel({
               raw.transcript && raw.transcript !== "\n"
                 ? raw.transcript
                 : "[inaudible]";
+            const detectedLanguage = detectLanguage(finalText);
+            if (detectedLanguage) {
+              updateLastUsedLanguage(detectedLanguage);
+            }
             addOrUpdateMessage(id, "user", finalText, "done");
           }
           return;
@@ -373,31 +495,8 @@ export function RealtimePanel({
       appendAssistantText,
       handleFunctionCall,
       markMessageDone,
+      updateLastUsedLanguage,
     ]
-  );
-
-  const handleTextSubmit = useCallback(
-    (event?: React.FormEvent) => {
-      event?.preventDefault();
-      if (!inputText.trim()) return;
-      try {
-        sendClientEvent({
-          type: "conversation.item.create",
-          item: {
-            type: "message",
-            role: "user",
-            content: [{ type: "input_text", text: inputText.trim() }],
-          },
-        });
-        sendClientEvent({ type: "response.create" });
-        setInputText("");
-      } catch (err) {
-        setConnectionError(
-          err instanceof Error ? err.message : "Unable to send message"
-        );
-      }
-    },
-    [inputText, sendClientEvent]
   );
 
   const sendSessionUpdate = useCallback(() => {
@@ -405,8 +504,8 @@ export function RealtimePanel({
 
     const session: Record<string, unknown> = {
       modalities: ["text", "audio"],
-      instructions: realtimeInstructions,
-      input_audio_transcription: { model: "gpt-4o-transcribe", language: "en" },
+      instructions: buildRealtimeInstructions(lastUsedLanguageRef.current),
+      input_audio_transcription: { model: "gpt-4o-transcribe" },
       tools: realtimeTools,
     };
 
@@ -427,6 +526,38 @@ export function RealtimePanel({
     }
   }, [model, sendClientEvent, voice]);
 
+  const handleTextSubmit = useCallback(
+    (event?: React.FormEvent) => {
+      event?.preventDefault();
+      if (!inputText.trim()) return;
+      try {
+        const text = inputText.trim();
+        const detectedLanguage = detectLanguage(text);
+        if (detectedLanguage) {
+          updateLastUsedLanguage(detectedLanguage);
+          if (dcRef.current?.readyState === "open") {
+            sendSessionUpdate();
+          }
+        }
+        sendClientEvent({
+          type: "conversation.item.create",
+          item: {
+            type: "message",
+            role: "user",
+            content: [{ type: "input_text", text }],
+          },
+        });
+        sendClientEvent({ type: "response.create" });
+        setInputText("");
+      } catch (err) {
+        setConnectionError(
+          err instanceof Error ? err.message : "Unable to send message"
+        );
+      }
+    },
+    [inputText, sendClientEvent, sendSessionUpdate, updateLastUsedLanguage]
+  );
+
   const handleConnect = useCallback(async () => {
     const attemptId = connectAttemptRef.current + 1;
     connectAttemptRef.current = attemptId;
@@ -440,7 +571,7 @@ export function RealtimePanel({
 
     try {
       const ephemeral = await createRealtimeSession(
-        realtimeInstructions,
+        buildRealtimeInstructions(lastUsedLanguageRef.current),
         abortController.signal
       );
       if (
@@ -588,7 +719,7 @@ export function RealtimePanel({
     if (connectionState === CONNECTION_STATES.CONNECTED) {
       sendSessionUpdate();
     }
-  }, [connectionState, sendSessionUpdate]);
+  }, [connectionState, lastUsedLanguage, sendSessionUpdate]);
 
   useEffect(() => {
     if (hasAutoConnectedRef.current) return;
